@@ -1,5 +1,7 @@
 import 'package:dpt_movil/data/api/conexion/interfaces/ConexionInscripcion.dart';
+import 'package:dpt_movil/data/mappers/inscripcionMapper.dart';
 import 'package:dpt_movil/data/models/inscripcionModelo.dart';
+import 'package:dpt_movil/data/models/inscripcionResumenModelo.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 import 'package:dpt_movil/domain/entities/inscripcionEntidad.dart';
 
@@ -11,7 +13,7 @@ class Inscripcionrepositorio {
     Inscripcionentidad inscripcion,
   ) async {
     try {
-      Inscripcionmodelo modelo = Inscripcionmodelo.fromEntidad(inscripcion);
+      Inscripcionmodelo modelo = InscripcionMapper.aModelo(inscripcion);
       RespuestaModelo respuesta = await conexion.agregarInscripcion(modelo);
       return respuesta;
     } on FormatException catch (formatError) {
@@ -28,6 +30,15 @@ class Inscripcionrepositorio {
         'AgregarInscripcion',
         'repositorio',
       );
+    } catch (error) {
+      //los errores se devuelven entre capas, tambien los que no son
+      //Exception, como un TypeError (IN-12)
+      return RespuestaModelo.fromObjectError(
+        error,
+        'POST',
+        'AgregarInscripcion',
+        'repositorio',
+      );
     }
   }
 
@@ -35,7 +46,7 @@ class Inscripcionrepositorio {
     Inscripcionentidad inscripcion,
   ) async {
     try {
-      Inscripcionmodelo modelo = Inscripcionmodelo.fromEntidad(inscripcion);
+      Inscripcionmodelo modelo = InscripcionMapper.aModelo(inscripcion);
       RespuestaModelo respuesta = await conexion.eliminarInscripcion(modelo);
       return respuesta;
     } on FormatException catch (formatError) {
@@ -52,12 +63,21 @@ class Inscripcionrepositorio {
         'EliminarInscripcion',
         'repositorio',
       );
+    } catch (error) {
+      //los errores se devuelven entre capas, tambien los que no son
+      //Exception, como un TypeError (IN-12)
+      return RespuestaModelo.fromObjectError(
+        error,
+        'PUT',
+        'EliminarInscripcion',
+        'repositorio',
+      );
     }
   }
 
   Future<RespuestaModelo> validarInscripcion(Inscripcionentidad entidad) async {
     try {
-      Inscripcionmodelo modelo = Inscripcionmodelo.fromEntidad(entidad);
+      Inscripcionmodelo modelo = InscripcionMapper.aModelo(entidad);
       RespuestaModelo respuesta = await conexion.validarInscripcion(modelo);
       return respuesta;
     } on FormatException catch (formatError) {
@@ -72,6 +92,34 @@ class Inscripcionrepositorio {
         error,
         'GET',
         'ValidarInscripcion',
+        'repositorio',
+      );
+    } catch (error) {
+      //los errores se devuelven entre capas, tambien los que no son
+      //Exception, como un TypeError (IN-12)
+      return RespuestaModelo.fromObjectError(
+        error,
+        'GET',
+        'ValidarInscripcion',
+        'repositorio',
+      );
+    }
+  }
+
+  Future<RespuestaModelo> obtenerMisCursos() async {
+    try {
+      RespuestaModelo respuesta = await conexion.obtenerMisCursos();
+      if (respuesta.codigoHttp == 200) {
+        respuesta.datos = InscripcionMapper.aResumenes(
+          respuesta.datos as List<Inscripcionresumenmodelo>,
+        );
+      }
+      return respuesta;
+    } catch (error) {
+      return RespuestaModelo.fromObjectError(
+        error,
+        'GET',
+        'ObtenerMisCursos',
         'repositorio',
       );
     }

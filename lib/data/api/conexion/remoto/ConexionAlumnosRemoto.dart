@@ -1,12 +1,15 @@
 import 'package:dio/dio.dart';
-import 'package:dpt_movil/config/configServicio.dart';
 import 'package:dpt_movil/data/api/conexion/interfaces/ConexionAlumnos.dart';
 import 'package:dpt_movil/data/models/alumnoModelo.dart';
 import 'package:dpt_movil/data/models/errorModelo.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 
 class Conexionalumnosremoto implements Conexionalumnos {
-  final _dio = Dio(BaseOptions(baseUrl: ConfigServicio().obtenerBaseApi()));
+  //el Dio compartido llega desde la raiz de composicion, con la baseUrl
+  final Dio _dio;
+
+  Conexionalumnosremoto(this._dio);
+
   @override
   Future<RespuestaModelo> obtenerAlumnosGrupo(
     String categoria,
@@ -15,10 +18,17 @@ class Conexionalumnosremoto implements Conexionalumnos {
     int iterable,
   ) async {
     String metodo = "GET";
-    String path =
-        '/alumnosGrupo?categoria=$categoria&curso=$curso&anio=$anio&iterable=$iterable';
+    String path = '/alumnosGrupo';
     try {
-      final response = await _dio.get(path);
+      final response = await _dio.get(
+        path,
+        queryParameters: {
+          'categoria': categoria,
+          'curso': curso,
+          'anio': anio,
+          'iterable': iterable,
+        },
+      );
       if (response.statusCode != 200) {
         return RespuestaModelo.fromResponse(response, metodo);
       }
@@ -39,6 +49,11 @@ class Conexionalumnosremoto implements Conexionalumnos {
           data.map((json) => Alumnomodelo.fromJson(json)).toList();
       return RespuestaModelo(codigoHttp: 200, datos: alumnos);
     } on DioException catch (dioError) {
+      //404 documentado en /v3/api-docs: "No existen alumnos para el grupo
+      //consultado". Un grupo sin alumnos no es un error (AL-03)
+      if (dioError.response?.statusCode == 404) {
+        return RespuestaModelo(codigoHttp: 200, datos: <Alumnomodelo>[]);
+      }
       return RespuestaModelo.fromDioException(dioError, metodo);
     } on FormatException catch (formatError) {
       return RespuestaModelo.fromFormatException(
@@ -47,8 +62,9 @@ class Conexionalumnosremoto implements Conexionalumnos {
         path,
         'conexion',
       );
-    } on Exception catch (error) {
-      return RespuestaModelo.fromException(error, metodo, path, 'conexion');
+    } catch (error) {
+      //un alumno incompleto hace lanzar un TypeError a fromJson (AL-04)
+      return RespuestaModelo.fromObjectError(error, metodo, path, 'conexion');
     }
   }
 }

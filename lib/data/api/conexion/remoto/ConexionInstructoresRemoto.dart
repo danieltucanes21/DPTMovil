@@ -1,12 +1,14 @@
 import 'package:dio/dio.dart';
-import 'package:dpt_movil/config/configServicio.dart';
 import 'package:dpt_movil/data/api/conexion/interfaces/ConexionInstructores.dart';
 import 'package:dpt_movil/data/models/errorModelo.dart';
 import 'package:dpt_movil/data/models/instructorModelo.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 
 class Conexioninstructoresremoto implements Conexioninstructores {
-  final _dio = Dio(BaseOptions(baseUrl: ConfigServicio().obtenerBaseApi()));
+  //el Dio compartido llega desde la raiz de composicion, con la baseUrl
+  final Dio _dio;
+
+  Conexioninstructoresremoto(this._dio);
 
   @override
   Future<RespuestaModelo> obtenerInstructores() async {
@@ -34,6 +36,11 @@ class Conexioninstructoresremoto implements Conexioninstructores {
           data.map((json) => Instructormodelo.fromJson(json)).toList();
       return RespuestaModelo(codigoHttp: 200, datos: instructores);
     } on DioException catch (dioError) {
+      //404 documentado en /v3/api-docs: "No existen instructores
+      //registrados". No hay instructores: lista vacia, no un error (IT-01)
+      if (dioError.response?.statusCode == 404) {
+        return RespuestaModelo(codigoHttp: 200, datos: <Instructormodelo>[]);
+      }
       return RespuestaModelo.fromDioException(dioError, metodo);
     } on FormatException catch (formatError) {
       return RespuestaModelo.fromFormatException(

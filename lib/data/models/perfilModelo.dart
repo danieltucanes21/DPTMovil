@@ -1,6 +1,3 @@
-import 'package:dpt_movil/domain/entities/PerfilEntidad.dart';
-import 'package:flutter/material.dart';
-
 class Perfilmodelo {
   String id;
 
@@ -18,6 +15,12 @@ class Perfilmodelo {
 
   String? tipoAlumno;
 
+  String? alumnoCodigo;
+
+  String? programa;
+
+  String? dependencia;
+
   Perfilmodelo({
     required this.id,
     required this.nombre,
@@ -27,20 +30,10 @@ class Perfilmodelo {
     this.role,
     this.facultad,
     this.tipoAlumno,
+    this.alumnoCodigo,
+    this.programa,
+    this.dependencia,
   });
-
-  factory Perfilmodelo.fromEntidad(PerfilEntidad entidad) {
-    return Perfilmodelo(
-      id: entidad.id,
-      nombre: entidad.nombre,
-      correo: entidad.correo,
-      tipoId: entidad.tipoId,
-      sexo: entidad.sexo,
-      facultad: entidad.facultad,
-      tipoAlumno: entidad.tipoAlumno,
-      role: entidad.role,
-    );
-  }
 
   factory Perfilmodelo.fromJson(dynamic json) {
     return Perfilmodelo(
@@ -51,6 +44,10 @@ class Perfilmodelo {
       sexo: json['sexo'],
       tipoAlumno: json['tipoAlumno'],
       role: json['role'],
+      facultad: json['facultad'],
+      alumnoCodigo: json['alumnoCodigo'],
+      programa: json['programa'],
+      dependencia: json['dependencia'],
     );
   }
   Map<String, dynamic> toJson() {
@@ -68,6 +65,12 @@ class Perfilmodelo {
       'facultad': facultad,
 
       'tipoAlumno': tipoAlumno,
+
+      'alumnoCodigo': alumnoCodigo,
+
+      'programa': programa,
+
+      'dependencia': dependencia,
 
       'role': role,
     };

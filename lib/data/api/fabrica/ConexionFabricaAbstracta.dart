@@ -1,15 +1,4 @@
 import 'package:dpt_movil/config/configServicio.dart';
-import 'package:dpt_movil/data/api/conexion/interfaces/ConexionAlumnos.dart';
-import 'package:dpt_movil/data/api/conexion/interfaces/ConexionAtenciones.dart';
-import 'package:dpt_movil/data/api/conexion/interfaces/ConexionAutenticacion.dart';
-import 'package:dpt_movil/data/api/conexion/interfaces/ConexionCategoria.dart';
-import 'package:dpt_movil/data/api/conexion/interfaces/ConexionClases.dart';
-import 'package:dpt_movil/data/api/conexion/interfaces/ConexionCurso.dart';
-import 'package:dpt_movil/data/api/conexion/interfaces/ConexionDeporte.dart';
-import 'package:dpt_movil/data/api/conexion/interfaces/ConexionEstadisticas.dart';
-import 'package:dpt_movil/data/api/conexion/interfaces/ConexionGrupos.dart';
-import 'package:dpt_movil/data/api/conexion/interfaces/ConexionHorarios.dart';
-import 'package:dpt_movil/data/api/conexion/interfaces/ConexionImagen.dart';
 import 'package:dpt_movil/data/api/fabrica/ConexionRemotaFabrica.dart';
 import 'package:dpt_movil/data/api/fabrica/ConexionLocalFabrica.dart';
 
@@ -27,15 +16,11 @@ abstract class ConexionFabricaAbstracta {
     return ConexionLocalFabrica();
   }
 
-  ConexionCategoria crearConexionCategoria();
-  ConexionCurso crearConexionCurso();
-  ConexionEstadisticas crearConexionEstadisticas();
-  Conexiongrupos crearConexionGrupos();
-  Conexionhorarios crearConexionHorarios();
-  Conexionalumnos crearConexionAlumnos();
-  Conexionclases crearConexionClases();
-  Conexionatenciones crearConexionAtenciones();
-  Conexionimagen crearConexionImagenes();
-  Conexiondeporte crearConexionDeporte();
-  Conexionautenticacion crearConexionAutenticacion();
+  //categoria ya no pasa por la fabrica: se inyecta desde la raiz (fase 1)
+  //curso, deporte e imagenes tampoco (fase 3), ni grupos, horarios,
+  //alumnos y clases (fase 4), ni atenciones (fase 5), ni estadisticas
+  //(fase 7). Ya no crea ninguna conexion: solo quedan las constantes que
+  //leen ConfigServicio y page1; se borra en la fase 8
+  //autenticacion nunca paso por la fabrica (lanzaba UnimplementedError):
+  //se inyecta desde la raiz (fase 2)
 }

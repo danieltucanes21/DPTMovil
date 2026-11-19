@@ -1,16 +1,13 @@
-import 'package:dpt_movil/data/api/fabrica/ConexionFabricaAbstracta.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 import 'package:dpt_movil/data/repositories/grupoRepositorio.dart';
 import 'package:dpt_movil/domain/entities/grupoEntidad.dart';
 
 class Serviciogrupo {
   Gruporepositorio repositorio;
-  Serviciogrupo()
-    : repositorio = Gruporepositorio(
-        conexion:
-            ConexionFabricaAbstracta.obtenerConexionFabrica()
-                .crearConexionGrupos(),
-      );
+
+  //el repositorio llega armado desde la raiz de composicion
+  //(lib/config/inyeccion/dependencias.dart)
+  Serviciogrupo(this.repositorio);
 
   Future<RespuestaModelo> listarGruposDe(String categoria, String curso) {
     return repositorio.listarGruposDe(categoria, curso);
@@ -27,4 +24,26 @@ class Serviciogrupo {
   Future<RespuestaModelo> insertarGrupo(Grupoentidad grupo) {
     return repositorio.insertarGrupo(grupo);
   }
+
+  Future<RespuestaModelo> listarGruposNoEliminados() {
+    return repositorio.listarGruposNoEliminados();
+  }
+
+  Future<RespuestaModelo> abrirInscripciones(
+    Grupoentidad grupo, {
+    DateTime? apertura,
+    required DateTime cierre,
+  }) {
+    return repositorio.abrirInscripciones(
+      grupo,
+      apertura: apertura,
+      cierre: cierre,
+    );
+  }
+
+  Future<RespuestaModelo> cerrarInscripciones(Grupoentidad grupo) {
+    return repositorio.cerrarInscripciones(grupo);
+  }
+
+  String urlImagen(int idImagen) => repositorio.urlImagen(idImagen);
 }

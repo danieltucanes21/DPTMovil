@@ -1,8 +1,7 @@
 import 'package:dpt_movil/data/api/conexion/interfaces/ConexionAlumnos.dart';
+import 'package:dpt_movil/data/mappers/alumnoMapper.dart';
 import 'package:dpt_movil/data/models/alumnoModelo.dart';
-import 'package:dpt_movil/data/models/horarioModelo.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
-import 'package:dpt_movil/domain/entities/alumnoEntidad.dart';
 
 class Alumnosrepositorio {
   Conexionalumnos cliente;
@@ -14,23 +13,20 @@ class Alumnosrepositorio {
     int anio,
     int iterable,
   ) async {
-    final RespuestaModelo respuesta = await cliente.obtenerAlumnosGrupo(
-      categoria,
-      curso,
-      anio,
-      iterable,
-    );
-    if (respuesta.codigoHttp != 200) {
-      return respuesta;
-    }
+    //la llamada va dentro del try: nada que lance la conexion atraviesa esta
+    //capa (AL-02)
     try {
-      List<Alumnomodelo> listaModelo = respuesta.datos as List<Alumnomodelo>;
-      List<Alumnoentidad> listaEntidad = [];
-      for (Alumnomodelo item in listaModelo) {
-        Alumnoentidad entidad = Alumnoentidad.fromModelo(item);
-        listaEntidad.add(entidad);
+      final RespuestaModelo respuesta = await cliente.obtenerAlumnosGrupo(
+        categoria,
+        curso,
+        anio,
+        iterable,
+      );
+      if (respuesta.codigoHttp != 200) {
+        return respuesta;
       }
-      respuesta.datos = listaEntidad;
+      List<Alumnomodelo> listaModelo = respuesta.datos as List<Alumnomodelo>;
+      respuesta.datos = listaModelo.map(AlumnoMapper.aEntidad).toList();
       return respuesta;
     } on FormatException catch (formatError) {
       return RespuestaModelo.fromFormatException(
@@ -39,8 +35,8 @@ class Alumnosrepositorio {
         'ObtenerAlumnosGrupo',
         'Repositorio',
       );
-    } on Exception catch (error) {
-      return RespuestaModelo.fromException(
+    } catch (error) {
+      return RespuestaModelo.fromObjectError(
         error,
         'GET',
         'ObtenerAlumnosGrupo',

@@ -1,4 +1,5 @@
 import 'package:dpt_movil/data/api/conexion/interfaces/ConexionAtenciones.dart';
+import 'package:dpt_movil/data/mappers/atencionMapper.dart';
 import 'package:dpt_movil/data/models/atencionModelo.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 import 'package:dpt_movil/domain/entities/atencionEntidad.dart';
@@ -6,38 +7,6 @@ import 'package:dpt_movil/domain/entities/atencionEntidad.dart';
 class Atencionesrepositorio {
   Conexionatenciones conexion;
   Atencionesrepositorio({required this.conexion});
-
-  Future<RespuestaModelo> obtenerAtencionesClaseById(int id) async {
-    String path = "obtenerAtencionesClaseById";
-    String metodo = "GET";
-    String capa = "Repositorio";
-    final RespuestaModelo respuesta = await conexion.obtenerAtencionesClaseById(
-      id,
-    );
-    if (respuesta.codigoHttp != 200) {
-      return respuesta;
-    }
-    try {
-      List<Atencionmodelo> listaModelo =
-          respuesta.datos as List<Atencionmodelo>;
-      List<Atencionentidad> listaEntidad = [];
-      for (Atencionmodelo item in listaModelo) {
-        Atencionentidad entidad = Atencionentidad.fromModelo(item);
-        listaEntidad.add(entidad);
-      }
-      respuesta.datos = listaEntidad;
-      return respuesta;
-    } on FormatException catch (formatError) {
-      return RespuestaModelo.fromFormatException(
-        formatError,
-        metodo,
-        path,
-        capa,
-      );
-    } on Exception catch (error) {
-      return RespuestaModelo.fromException(error, metodo, path, capa);
-    }
-  }
 
   Future<RespuestaModelo> listarAtencionesClase(
     String categoria,
@@ -62,12 +31,7 @@ class Atencionesrepositorio {
     try {
       List<Atencionmodelo> listaModelo =
           respuesta.datos as List<Atencionmodelo>;
-      List<Atencionentidad> listaEntidad = [];
-      for (Atencionmodelo item in listaModelo) {
-        Atencionentidad entidad = Atencionentidad.fromModelo(item);
-        listaEntidad.add(entidad);
-      }
-      respuesta.datos = listaEntidad;
+      respuesta.datos = listaModelo.map(AtencionMapper.aEntidad).toList();
       return respuesta;
     } on FormatException catch (formatError) {
       return RespuestaModelo.fromFormatException(
@@ -85,16 +49,26 @@ class Atencionesrepositorio {
     List<Atencionentidad> atenciones,
     int idClase,
   ) async {
-    List<Atencionmodelo> lista = [];
-    for (Atencionentidad atencion in atenciones) {
-      lista.add(
-        Atencionmodelo(
-          idPerfil: atencion.idPerfil,
-          idClase: atencion.idClase,
-          estaAtendido: atencion.estaAtendido,
-        ),
+    //una atencion de otra clase no se envia: se corregiria la asistencia ajena
+    if (atenciones.any((a) => a.idClase != idClase)) {
+      return RespuestaModelo.fromObjectError(
+        'hay atenciones de otra clase que la $idClase',
+        'PUT',
+        'registrarAtencionesClase',
+        'Repositorio',
       );
     }
-    return await conexion.registrarAtencionesClase(lista, idClase);
+    try {
+      List<Atencionmodelo> lista =
+          atenciones.map(AtencionMapper.aModelo).toList();
+      return await conexion.registrarAtencionesClase(lista, idClase);
+    } catch (error) {
+      return RespuestaModelo.fromObjectError(
+        error,
+        'PUT',
+        'registrarAtencionesClase',
+        'Repositorio',
+      );
+    }
   }
 }

@@ -1,6 +1,3 @@
-import 'package:dpt_movil/data/models/imagenModelo.dart';
-import 'package:dpt_movil/domain/entities/grupoEntidad.dart';
-
 class GrupoModelo {
   String cat_titulo;
   String cur_nombre;
@@ -12,6 +9,16 @@ class GrupoModelo {
   String? estado;
   String fechaCreacion;
   String? fechaFinalizacion;
+  //periodo de inscripcion (yyyy-MM-dd); lo fija el coordinador al abrir o
+  //cerrar inscripciones. Null = nunca se abrio
+  String? fechaInscripcionApertura;
+  String? fechaInscripcionCierre;
+  //solo de salida: se cambia con PATCH /grupo/inscripciones
+  bool inscripcionesCerradasManual;
+
+  //la clave del cierre en el json del backend lleva una errata (falta la
+  //"s"): se aisla aqui para que el resto de la app use el nombre correcto
+  static const String claveCierreInscripcion = 'fechaIncripcionCierre';
 
   GrupoModelo({
     required this.cat_titulo,
@@ -24,6 +31,9 @@ class GrupoModelo {
     required this.fechaCreacion,
     this.fechaFinalizacion,
     this.idInstructor,
+    this.fechaInscripcionApertura,
+    this.fechaInscripcionCierre,
+    this.inscripcionesCerradasManual = false,
   });
 
   factory GrupoModelo.fromJson(dynamic json) {
@@ -41,32 +51,29 @@ class GrupoModelo {
           (json['fechaFinalizacion'] != null)
               ? json['fechaFinalizacion']
               : null,
-    );
-  }
-
-  factory GrupoModelo.fromEntidad(Grupoentidad entidad) {
-    return GrupoModelo(
-      cat_titulo: entidad.categoria,
-      cur_nombre: entidad.curso,
-      anio: entidad.anio,
-      iterable: entidad.iterable,
-      cupos: entidad.cupos,
-      fechaCreacion: entidad.fechaCreacion,
-      idInstructor: entidad.idInstructor,
-      imagen: entidad.imagen,
+      fechaInscripcionApertura: json['fechaInscripcionApertura'],
+      fechaInscripcionCierre: json[claveCierreInscripcion],
+      inscripcionesCerradasManual: json['inscripcionesCerradasManual'] ?? false,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'cat_titulo': cat_titulo,
-      'cur_nombre': cur_nombre,
+      'categoria': cat_titulo,
+      'curso': cur_nombre,
       'anio': anio,
       'iterable': iterable,
-      'imagen': imagen,
+      'imagenGrupo': imagen,
       'idInstructor': idInstructor,
       'cupos': cupos,
       'fechaCreacion': fechaCreacion,
+      //opcional en GrupoDto: sin fecha el POST queda como antes
+      if (fechaFinalizacion != null) 'fechaFinalizacion': fechaFinalizacion,
+      if (fechaInscripcionApertura != null)
+        'fechaInscripcionApertura': fechaInscripcionApertura,
+      //el backend exige el cierre al crear un grupo (GC-0015)
+      if (fechaInscripcionCierre != null)
+        claveCierreInscripcion: fechaInscripcionCierre,
     };
   }
 }

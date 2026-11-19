@@ -1,0 +1,14 @@
+[
+  {
+    "idPerfil": "1061001",
+    "asistio": false
+  },
+  {
+    "idPerfil": "1061002",
+    "asistio": true
+  },
+  {
+    "idPerfil": "1061003",
+    "asistio": true
+  }
+]

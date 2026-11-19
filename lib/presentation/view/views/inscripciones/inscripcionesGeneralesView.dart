@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:dpt_movil/config/formatDate.dart';
 import 'package:dpt_movil/config/routes/app_rutas.dart';
 import 'package:dpt_movil/config/theme/color_tema.dart';
 import 'package:dpt_movil/config/theme/tipografia.dart';
-import 'package:dpt_movil/presentation/view/widgets/alertFechas.dart';
+import 'package:dpt_movil/domain/entities/resultado.dart';
+import 'package:dpt_movil/presentation/view/widgets/dialogError.dart';
 import 'package:dpt_movil/presentation/view/widgets/bar.dart';
 import 'package:dpt_movil/presentation/view/widgets/menuLateral.dart';
 import 'package:dpt_movil/presentation/viewmodels/categoriaViewModel.dart';
@@ -19,20 +19,31 @@ class InscripcionesGeneralesView extends StatefulWidget {
 
 class _InscripcionesGeneralesState extends State<InscripcionesGeneralesView> {
   //estado
-  CategoriaViewModel categoriaViewModel = CategoriaViewModel();
+  late CategoriaViewModel categoriaViewModel;
   String? _categoriaSeleccionada;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      //obtenemos cada vez que se inicialize el widget y asignamos el provider
-      categoriaViewModel =
-          Provider.of<CategoriaViewModel>(context, listen: false);
-      //cargamos las categorias
-      //categoriaViewModel.fetchCategorias();
-      categoriaViewModel.cargarCategorias(context);
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _cargarCategorias());
+  }
+
+  //el vm devuelve el resultado ya resuelto; el aviso es decision de la vista.
+  //Una lista vacia no es un error: el filtro queda sin opciones
+  Future<void> _cargarCategorias() async {
+    final resultado =
+        await context.read<CategoriaViewModel>().listarYNotificarCategorias();
+    if (resultado is Fallo<void> && mounted) {
+      showDialog(
+        context: context,
+        builder:
+            (_) => DialogError(
+              titulo: 'No se pudieron cargar las categorias',
+              mensaje: resultado.mensaje,
+              codigo: resultado.codigo,
+            ),
+      );
+    }
   }
 
   @override
@@ -57,7 +68,10 @@ class _InscripcionesGeneralesState extends State<InscripcionesGeneralesView> {
       hintText: 'sin seleccion',
       helperText: 'seleccion una categoria',
       textAlign: TextAlign.center,
-      dropdownMenuEntries: categoriaViewModel.getListaEntradas,
+      dropdownMenuEntries: [
+        for (final titulo in categoriaViewModel.titulos)
+          DropdownMenuEntry(value: titulo, label: titulo),
+      ],
       onSelected: (seleccion) {
         setState(() {
           _categoriaSeleccionada = seleccion;
@@ -84,44 +98,19 @@ class _InscripcionesGeneralesState extends State<InscripcionesGeneralesView> {
           'A continuacion selecciones la categoria de la cual desea manipular todas las inscripciones',
           style: Tipografia.cuerpo2()),
     );
-    Widget abrir = OutlinedButton(
-      onPressed: () {
-        if (_categoriaSeleccionada != null) {
-          _confirmarAbrir(context, _categoriaSeleccionada!);
-        }
-      },
-      child: Text('Abrir'),
-    );
+    //decision D1 (plan de abrir inscripciones): el backend solo abre y cierra
+    //por grupo. Hasta que tenga un endpoint por categoria las acciones se
+    //muestran deshabilitadas y se remite a la configuracion por grupo; antes
+    //confirmaban sin hacer nada
+    Widget abrir = OutlinedButton(onPressed: null, child: Text('Abrir'));
     Widget cerrar = OutlinedButton(
-        onPressed: () {
-          if (_categoriaSeleccionada != null) {
-            _confirmarCerrar(context, _categoriaSeleccionada!);
-          }
-        },
+        onPressed: null,
         style: OutlinedButton.styleFrom(
             foregroundColor: ColorTheme.secondary,
             side: BorderSide(color: ColorTheme.secondary)),
         child: Text('Cerrar'));
     Widget programar = OutlinedButton(
-        onPressed: () {
-          if (_categoriaSeleccionada != null) {
-            //_mostrarProgramar(context, _categoriaSeleccionada!);
-            showDialog(
-              context: context,
-              builder: (context) {
-                return AlertFechas(
-                    titulo: 'Inscripciones $_categoriaSeleccionada',
-                    contenido:
-                        'Asigne la fecha de apertura y cierre de inscripciones a la categoria $_categoriaSeleccionada',
-                    seleccionRango: (DateTime fecha1, DateTime? fecha2) {
-                      print(fecha1);
-                      print(fecha2);
-                      //TODO: funcion que ejecuta la accion
-                    });
-              },
-            );
-          }
-        },
+        onPressed: null,
         style: OutlinedButton.styleFrom(
             foregroundColor: ColorTheme.tertiary,
             side: BorderSide(color: ColorTheme.tertiary)),
@@ -129,12 +118,17 @@ class _InscripcionesGeneralesState extends State<InscripcionesGeneralesView> {
     Widget acciones = Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [abrir, cerrar, programar]);
+    Widget aviso = ListTile(
+      subtitle: Text(
+          'Abrir, cerrar o programar todos los grupos de una categoria aun no esta disponible. Use la CONFIGURACION DETALLADA para hacerlo grupo por grupo.',
+          style: Tipografia.cuerpo2(color: ColorTheme.secondaryDark)),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         descripcion,
         filtro(),
-        if (_categoriaSeleccionada != null) acciones
+        if (_categoriaSeleccionada != null) ...[acciones, aviso]
       ],
     );
   }
@@ -151,64 +145,4 @@ class _InscripcionesGeneralesState extends State<InscripcionesGeneralesView> {
     );
   }
 
-  void _confirmarAbrir(BuildContext context, String categoria) {
-    showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Abrir Inscripciones '),
-            content: Text(
-                '¿Esta seguro de abrir las inscripciones de todos los grupos para la categoria $categoria?',
-                textAlign: TextAlign.center),
-            actions: [
-              TextButton(
-                  onPressed: () {
-                    //cierra el alert
-                    Navigator.of(context).pop();
-                  },
-                  child: Text('Confirmar')),
-              TextButton(
-                  onPressed: () {
-                    //cierra el dialogo
-                    Navigator.of(context).pop();
-                  },
-                  child: Text('Cancelar'),
-                  style: FilledButton.styleFrom(
-                      foregroundColor: ColorTheme.secondary))
-            ],
-          );
-        });
-  }
-
-  void _confirmarCerrar(BuildContext context, String categoria) {
-    showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Cerrar Inscripciones '),
-            content: Text(
-              '¿Esta seguro de cerrar las inscripciones de todos los grupos para la categoria $categoria?',
-              textAlign: TextAlign.center,
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () {
-                    //TODO: llamar funcion para ejecutar accion
-                    //cierra el alert
-                    Navigator.of(context).pop();
-                  },
-                  child: Text('Confirmar')),
-              TextButton(
-                onPressed: () {
-                  //cierra el dialogo
-                  Navigator.of(context).pop();
-                },
-                style: FilledButton.styleFrom(
-                    foregroundColor: ColorTheme.secondary),
-                child: Text('Cancelar'),
-              )
-            ],
-          );
-        });
-  }
 }

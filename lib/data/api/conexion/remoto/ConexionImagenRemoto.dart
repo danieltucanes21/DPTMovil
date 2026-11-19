@@ -1,21 +1,23 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:dpt_movil/config/configServicio.dart';
 import 'package:dpt_movil/data/api/conexion/interfaces/ConexionImagen.dart';
 import 'package:dpt_movil/data/models/imagenModelo.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 import 'package:mime/mime.dart';
 
 class Conexionimagenremoto implements Conexionimagen {
-  final _dio = Dio(
-    BaseOptions(
-      baseUrl: ConfigServicio().obtenerBaseApi(),
-      connectTimeout: Duration(minutes: 10),
-      receiveTimeout: Duration(minutes: 10),
-      sendTimeout: Duration(minutes: 10),
-    ),
+  final Dio _dio;
+
+  //las imagenes tardan mas que el resto: se piden 30 s en cada peticion,
+  //tambien cuando el Dio es el compartido de la raiz (20 s)
+  static final Options _opcionesImagen = Options(
+    sendTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 30),
   );
+
+  //el Dio compartido llega desde la raiz de composicion
+  Conexionimagenremoto(this._dio);
 
   @override
   Future<RespuestaModelo> insertarImagenFile(File file) async {
@@ -36,7 +38,11 @@ class Conexionimagenremoto implements Conexionimagen {
         ),
       });
 
-      final response = await _dio.post(path, data: fromData);
+      final response = await _dio.post(
+        path,
+        data: fromData,
+        options: _opcionesImagen,
+      );
       if (response.statusCode != 201) {
         return RespuestaModelo.fromResponse(response, metodo);
       }
@@ -62,7 +68,7 @@ class Conexionimagenremoto implements Conexionimagen {
     //String path = "/imagen?idImagen=$idImagen";
     String path = "/imagen?idImagen=$idImagen";
     try {
-      final response = await _dio.get(path);
+      final response = await _dio.get(path, options: _opcionesImagen);
       if (response.statusCode != 200) {
         return RespuestaModelo.fromResponse(response, metodo);
       }
@@ -83,6 +89,10 @@ class Conexionimagenremoto implements Conexionimagen {
       );
     } on Exception catch (error) {
       return RespuestaModelo.fromException(error, metodo, path, 'conexion');
+    } catch (error) {
+      //una imagen con un campo obligatorio nulo hace lanzar un TypeError a
+      //fromJson (IM-01)
+      return RespuestaModelo.fromObjectError(error, metodo, path, 'conexion');
     }
   }
 }

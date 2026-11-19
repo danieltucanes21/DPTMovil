@@ -1,5 +1,3 @@
-import 'package:dpt_movil/domain/entities/inscripcionEntidad.dart';
-
 class Inscripcionmodelo {
   DateTime? fechaInscripcion;
 
@@ -37,23 +35,12 @@ class Inscripcionmodelo {
     );
   }
 
-  factory Inscripcionmodelo.fromEntidad(Inscripcionentidad entidad) {
-    return Inscripcionmodelo(
-      alumnoId: entidad.alumnoId,
-      categoria: entidad.categoria,
-      curso: entidad.curso,
-      anio: entidad.anio,
-      iterable: entidad.iterable,
-      fechaInscripcion: entidad.fechaInscripcion,
-      fechaDesvinculacion: entidad.fechaDesvinculacion,
-    );
-  }
-
   Map<String, dynamic> toJson() {
     return {
-      'fechaInscripcion': fechaInscripcion,
+      //un DateTime no se puede codificar en JSON (IN-11)
+      'fechaInscripcion': fechaInscripcion?.toIso8601String(),
 
-      'fechaDesvinculacion': fechaDesvinculacion,
+      'fechaDesvinculacion': fechaDesvinculacion?.toIso8601String(),
 
       'alumnoId': alumnoId,
 

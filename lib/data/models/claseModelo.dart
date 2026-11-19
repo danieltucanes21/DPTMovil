@@ -1,6 +1,4 @@
 import 'package:dpt_movil/config/formatDate.dart';
-import 'package:dpt_movil/domain/entities/claseEntidad.dart';
-import 'package:flutter/material.dart';
 
 class Clasemodelo {
   int? codigo;
@@ -13,6 +11,7 @@ class Clasemodelo {
   int horas;
   int minutos;
   String? observacion;
+  String? justificacion;
   int eliminado;
 
   Clasemodelo({
@@ -26,6 +25,7 @@ class Clasemodelo {
     required this.horas,
     required this.minutos,
     this.observacion,
+    this.justificacion,
     required this.eliminado,
   });
 
@@ -41,23 +41,8 @@ class Clasemodelo {
       horas: json['horas'],
       minutos: json['minutos'],
       observacion: json['observacion'],
+      justificacion: json['justificacion'],
       eliminado: json['eliminado'],
-    );
-  }
-
-  factory Clasemodelo.fromEntidad(Claseentidad entidad) {
-    return Clasemodelo(
-      idGrupoCategoria: entidad.idGrupoCategoria,
-      idGrupoCurso: entidad.idGrupoCurso,
-      idGrupoAnio: entidad.idGrupoAnio,
-      idGrupoIterable: entidad.idGrupoIterable,
-      idInstructor: entidad.idInstructor,
-      fecha: entidad.fecha!,
-      horas: entidad.horas!,
-      minutos: entidad.minutos!,
-      eliminado: entidad.eliminado,
-      codigo: entidad.codigo,
-      observacion: entidad.observacion,
     );
   }
 
@@ -74,7 +59,9 @@ class Clasemodelo {
 
       'idInstructor': idInstructor,
 
-      'fecha': fecha.toIso8601String(),
+      //solo el dia elegido: el backend recibe un LocalDate. Con la hora en UTC,
+      //desde las 19:00 locales la clase caia en el dia siguiente (CL-07)
+      'fecha': FormatDate.fechaACadena(fecha, '-'),
 
       'horas': horas,
 
@@ -83,6 +70,10 @@ class Clasemodelo {
       'observacion': observacion,
 
       'eliminado': eliminado,
+
+      //solo si hay: el backend la exige cuando el grupo no tiene horario ese
+      //dia y la ignora cuando lo tiene (BK-04)
+      if (justificacion != null) 'justificacion': justificacion,
     };
   }
 }

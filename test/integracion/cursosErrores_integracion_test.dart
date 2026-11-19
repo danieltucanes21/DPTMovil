@@ -1,0 +1,79 @@
+import 'package:dpt_movil/data/api/conexion/remoto/ConexionCursoRemoto.dart';
+import 'package:dpt_movil/data/api/conexion/remoto/ConexionImagenRemoto.dart';
+import 'package:dpt_movil/data/repositories/cursoRepositorio.dart';
+import 'package:dpt_movil/domain/entities/categoriaEntidad.dart';
+import 'package:dpt_movil/domain/servicios/servicioCurso.dart';
+import 'package:dpt_movil/presentation/viewmodels/cursosViewModel.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../contratos/leerContrato.dart';
+import '../dobles/adaptadorHttpFalso.dart';
+
+//diagnostico de cursos de punta a punta sin backend (plan-diagnostico-
+//cursos.md): el mismo montaje que test/integracion/cursos_integracion_test.dart.
+//Afirman el comportamiento CORRECTO y se espera que salgan rojas mientras el
+//bug exista
+void main() {
+  const String capa = "integracion";
+  const String tipo = "local";
+
+  late AdaptadorHttpFalso adaptador;
+  late CursoRepositorio repositorio;
+  late CursosViewModel vm;
+
+  setUp(() {
+    adaptador = AdaptadorHttpFalso();
+    final dio = crearDioFalso(adaptador);
+    repositorio = CursoRepositorio(
+      cliente: ConexionCursoRemoto(dio, Conexionimagenremoto(dio)),
+    );
+    vm = CursosViewModel(ServicioCurso(repositorio));
+  });
+
+  group('Cursos (errores de punta a punta):', () {
+    //el "&" corta el valor en la query: el backend recibe otra categoria
+    test('$capa - $tipo - Listar y obtener curso - categoria y curso llegan completos a la query', () async {
+      adaptador.responder('GET', '/cursosbycategoria', 200, []);
+      adaptador.responder('GET', '/curso', 200, leerContrato('cursos', 'curso_200'));
+
+      await vm.listarCursosDe(CategoriaEntidad(titulo: 'Fútbol & Voleibol', descripcion: 'x'),
+      );
+      await vm.obtenerCurso('Fútbol & Voleibol', 'Nivel 1 + 2');
+
+      final lista =
+          adaptador.peticionesA('GET', '/cursosbycategoria').single.uri.queryParameters;
+      final uno = adaptador.peticionesA('GET', '/curso').single.uri.queryParameters;
+      expect(
+        [lista['prmCategoria'], uno['prmCategoria'], uno['prmCurso']],
+        ['Fútbol & Voleibol', 'Fútbol & Voleibol', 'Nivel 1 + 2'],
+      );
+    });
+
+    //un curso sin "deporte": CursoModelo.fromJson lanza un TypeError y las
+    //dos lecturas solo capturan Exception
+    test('$capa - $tipo - Listar y obtener curso - un curso incompleto vuelve como error de la conexion, sin lanzar', () async {
+      final incompleto = Map<String, dynamic>.from(
+        leerContrato('cursos', 'curso_200') as Map,
+      )..remove('deporte');
+      adaptador.responder('GET', '/cursosbycategoria', 200, [incompleto]);
+      adaptador.responder('GET', '/curso', 200, incompleto);
+
+      for (final pedir in <Future<dynamic> Function()>[
+        () => repositorio.listarCursosDe(
+          CategoriaEntidad(titulo: 'Categoria Fase 4', descripcion: 'x'),
+        ),
+        () => repositorio.obtenerCurso('Categoria Fase 4', 'Curso Categoria Fase 4'),
+      ]) {
+        Object? lanzado;
+        dynamic respuesta;
+        try {
+          respuesta = await pedir();
+        } catch (e) {
+          lanzado = e;
+        }
+        expect(lanzado, isNull, reason: 'lanzo: $lanzado');
+        expect(respuesta.codigoHttp, isNot(200));
+      }
+    });
+  });
+}

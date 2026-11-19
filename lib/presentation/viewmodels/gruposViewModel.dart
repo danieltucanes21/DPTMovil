@@ -1,12 +1,16 @@
-import 'package:dpt_movil/data/models/errorModelo.dart';
+import 'package:dpt_movil/config/formatDate.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
+import 'package:dpt_movil/domain/entities/cursoEntidad.dart';
 import 'package:dpt_movil/domain/entities/grupoEntidad.dart';
+import 'package:dpt_movil/domain/entities/resultado.dart';
 import 'package:dpt_movil/domain/servicios/servicioGrupo.dart';
-import 'package:dpt_movil/presentation/view/widgets/dialogError.dart';
+import 'package:dpt_movil/presentation/viewmodels/estadoSeccion.dart';
 import 'package:flutter/material.dart';
 
-class Gruposviewmodel with ChangeNotifier {
-  late final Serviciogrupo serviciogrupo;
+//NotificacionSegura (fase 6c): las pantallas encadenan la carga de la lista
+//con otras y el usuario puede salir antes de que llegue
+class Gruposviewmodel with ChangeNotifier, NotificacionSegura {
+  final Serviciogrupo serviciogrupo;
 
   bool _cargando = false;
   bool get cargando => _cargando;
@@ -20,15 +24,22 @@ class Gruposviewmodel with ChangeNotifier {
   //get para la lista
   List<Grupoentidad>? get getListaGrupos => _listaGrupos;
 
-  Gruposviewmodel() : serviciogrupo = Serviciogrupo();
+  //el servicio sale de la raiz. Hay una instancia global (GruposAsignados y
+  //GruposInscripcion, fase 6) y una propia en las rutas curso y grupoFormulario
+  Gruposviewmodel(this.serviciogrupo);
+
+  //url de la imagen de un grupo o curso: la vista no conoce el servidor
+  String urlImagen(int idImagen) => serviciogrupo.urlImagen(idImagen);
 
   Future<List<Grupoentidad>> listarGruposDe(
     String categoria,
     String curso,
   ) async {
     RespuestaModelo? respuesta;
-    _listaGrupos = [];
-    _cargando == true;
+    //null mientras carga: con [] la vista pintaba un instante "aun no hay
+    //grupos" antes de que llegaran los datos
+    _listaGrupos = null;
+    _cargando = true;
     _error = null;
     notifyListeners();
     try {
@@ -37,7 +48,7 @@ class Gruposviewmodel with ChangeNotifier {
         _cargando = false;
         _error = respuesta.error?.mensaje ?? "no hay datos del error";
         notifyListeners();
-        return Future.value(_listaGrupos);
+        return Future.value([]);
       }
       if (respuesta.datos is List<Grupoentidad>) {
         _listaGrupos = respuesta.datos as List<Grupoentidad>;
@@ -128,11 +139,80 @@ class Gruposviewmodel with ChangeNotifier {
     }
   }
 
+  //punto de entrada del formulario: aplica las reglas que antes vivian en la
+  //vista (instructor obligatorio, cupos numericos), arma el grupo del curso y
+  //lo registra. La vista entrega lo que hay en pantalla y recibe exito o
+  //fallo ya resueltos. [hoy] fija el anio y la fecha de creacion; por
+  //defecto el reloj del dispositivo, como antes
+  Future<Resultado<Grupoentidad>> registrarGrupo({
+    required CursoEntidad curso,
+    required String cupos,
+    String? idInstructor,
+    DateTime? aperturaInscripcion,
+    DateTime? cierreInscripcion,
+    Grupoentidad? original, //null = crear
+    DateTime? hoy,
+  }) async {
+    //no hay operacion de edicion; ninguna pantalla abre el formulario asi,
+    //pero si llega se dice en vez de callar
+    if (original != null) {
+      return Fallo(0, 'La edicion de grupos aun no esta disponible', origen: 'ViewModel');
+    }
+    if (idInstructor == null) {
+      return Fallo(0, 'Seleccione un instructor', origen: 'ViewModel');
+    }
+    //el campo solo admite digitos, pero no limita el largo: int.parse lanzaba
+    //con un numero que no cabe en un int
+    final numeroCupos = int.tryParse(cupos.trim());
+    if (numeroCupos == null) {
+      return Fallo(0, 'Los cupos deben ser un numero valido', origen: 'ViewModel');
+    }
+    //POST /grupo responde 422 GC-0015 sin cierre o con el cierre antes de la
+    //apertura
+    if (cierreInscripcion == null) {
+      return Fallo(0, 'Seleccione la fecha de cierre de inscripciones', origen: 'ViewModel');
+    }
+    if (aperturaInscripcion != null && cierreInscripcion.isBefore(aperturaInscripcion)) {
+      return Fallo(
+        0,
+        'La fecha de cierre no puede ser anterior a la de apertura',
+        origen: 'ViewModel',
+      );
+    }
+    final fecha = hoy ?? DateTime.now();
+    final grupo = Grupoentidad(
+      categoria: curso.tituloCategoria,
+      curso: curso.nombreCurso,
+      anio: fecha.year,
+      //el iterable lo asigna el backend
+      iterable: 0,
+      imagen: curso.imagen,
+      cupos: numeroCupos,
+      idInstructor: idInstructor,
+      fechaCreacion: FormatDate.fechaACadena(fecha, '-'),
+      fechaInscripcionApertura:
+          aperturaInscripcion == null
+              ? null
+              : FormatDate.fechaACadena(aperturaInscripcion, '-'),
+      fechaInscripcionCierre: FormatDate.fechaACadena(cierreInscripcion, '-'),
+    );
+    final respuesta = await insertarGrupo(grupo);
+    if (respuesta.codigoHttp == 201) {
+      return Exito(respuesta.datos is Grupoentidad ? respuesta.datos as Grupoentidad : null);
+    }
+    final error = respuesta.error;
+    return Fallo(
+      respuesta.codigoHttp,
+      error?.mensaje ?? 'Error desconocido. Código: ${respuesta.codigoHttp}',
+      origen: error == null ? null : '${error.metodo} ${error.url}',
+    );
+  }
+
   Future<RespuestaModelo> insertarGrupo(Grupoentidad entidad) async {
     try {
-      RespuestaModelo respuesta = await serviciogrupo.insertarGrupo(entidad);
-      listarGruposDe(entidad.categoria, entidad.curso);
-      return respuesta;
+      //no refresca: el formulario tiene su propio vm y la pantalla del
+      //curso recarga su lista al volver con pop(true)
+      return await serviciogrupo.insertarGrupo(entidad);
     } catch (error) {
       return RespuestaModelo.fromObjectError(
         error,

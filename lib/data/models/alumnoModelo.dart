@@ -25,13 +25,13 @@ class Alumnomodelo {
     return Alumnomodelo(
       id: json['id'],
       codigo: json['codigo'],
+      imagen: json['imagen'],
       tipo: json['tipo'],
       nombre: json['nombre'],
       correo: json['correo'],
       sexo: json['sexo'],
       tipoid: json['tipoid'],
       eliminadoestado: json['eliminadoestado'],
-      imagen: json['imagen'],
     );
   }
   Map<String, dynamic> toJson() {

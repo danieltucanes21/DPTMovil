@@ -1,16 +1,16 @@
+import 'package:dpt_movil/domain/entities/diaSemana.dart';
 import 'package:dpt_movil/config/theme/color_tema.dart';
 import 'package:dpt_movil/config/theme/tipografia.dart';
-import 'package:dpt_movil/data/models/respuestaModelo.dart';
 import 'package:dpt_movil/domain/entities/grupoEntidad.dart';
 import 'package:dpt_movil/domain/entities/horarioEntidad.dart';
 import 'package:dpt_movil/domain/entities/inscripcionEntidad.dart';
+import 'package:dpt_movil/domain/entities/resultado.dart';
 import 'package:dpt_movil/presentation/view/widgets/bar.dart';
-import 'package:dpt_movil/presentation/view/widgets/dialogCargando.dart';
 import 'package:dpt_movil/presentation/view/widgets/dialogError.dart';
 import 'package:dpt_movil/presentation/view/widgets/dialogExito.dart';
-import 'package:dpt_movil/presentation/view/widgets/edit_icon.dart';
 import 'package:dpt_movil/presentation/view/widgets/menuLateral.dart';
 import 'package:dpt_movil/presentation/view/widgets/tarjeta.dart';
+import 'package:dpt_movil/presentation/viewmodels/estadoSeccion.dart';
 import 'package:dpt_movil/presentation/viewmodels/gruposViewModel.dart';
 import 'package:dpt_movil/presentation/viewmodels/horariosViewModel.dart';
 import 'package:dpt_movil/presentation/viewmodels/inscripcionViewModel.dart';
@@ -30,9 +30,17 @@ class _GrupoInscripcionState extends State<Gruposinscripcion> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
-      final vm = Provider.of<Gruposviewmodel>(context, listen: false);
-      vm.listarGruposDisponiblesInscripcion();
+    //los vms los crea la ruta gruposDisponiblesInscripcion. La carga se
+    //encadena aqui una sola vez (fase 6c): primero la lista y, con ella, los
+    //horarios y el estado de inscripcion de cada grupo
+    final grupos = context.read<Gruposviewmodel>();
+    final horarios = context.read<Horariosviewmodel>();
+    final inscripcion = context.read<Inscripcionviewmodel>();
+    Future.microtask(() async {
+      await grupos.listarGruposDisponiblesInscripcion();
+      final lista = grupos.getListaGrupos ?? [];
+      horarios.cargarHorariosDe(lista);
+      inscripcion.cargarEstados(widget.alumnoId, lista);
     });
   }
 
@@ -93,112 +101,197 @@ class _GrupoInscripcionState extends State<Gruposinscripcion> {
     );
   }
 
+  //cada parte de la tarjeta lee solo el estado de su grupo con
+  //context.select: cuando llega un horario o cambia una inscripcion se
+  //reconstruye esa tarjeta, sin volver a pedir nada al backend
   Widget mostrarTarjeta(Grupoentidad grupo) {
-    Inscripcionentidad inscripcion = Inscripcionentidad(
-      alumnoId: widget.alumnoId,
-      categoria: grupo.categoria,
-      curso: grupo.curso,
-      anio: grupo.anio,
-      iterable: grupo.iterable,
-    );
     return Stack(
       alignment: Alignment.center,
       children: [
-        Consumer<Horariosviewmodel>(
-          builder: (context, vmHorarios, _) {
-            return FutureBuilder(
-              future: vmHorarios.listarHorariosGrupo(
-                grupo.categoria,
-                grupo.curso,
-                grupo.anio,
-                grupo.iterable,
-              ),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return Center(child: CircularProgressIndicator());
-                }
-                RespuestaModelo respuesta = snapshot.data!;
-                List<Horarioentidad> listaHorarios =
-                    respuesta.datos as List<Horarioentidad>;
-                String descripcion = '';
-                for (Horarioentidad horario in listaHorarios) {
-                  descripcion =
-                      descripcion +
-                      '${horario.dia}: ${horario.horaInicio} - ${horario.horaFin} \n';
-                }
-                return Tarjeta(
-                  atrTitulo: '${grupo.curso}-${grupo.anio}-${grupo.iterable}',
-                  atrInfoPie: grupo.categoria,
-                  idImagen: grupo.imagen,
-                  atrDescripcion: descripcion,
-                );
-              },
+        Builder(
+          builder: (context) {
+            final horarios = context.select<
+              Horariosviewmodel,
+              EstadoSeccion<List<Horarioentidad>>
+            >((vm) => vm.horariosDe(grupo));
+            if (horarios.cargando) {
+              return Center(child: CircularProgressIndicator());
+            }
+            return Tarjeta(
+              atrTitulo: '${grupo.curso}-${grupo.anio}-${grupo.iterable}',
+              atrInfoPie: grupo.categoria,
+              //la url la da el vm; la tarjeta ya no arma la del servidor
+              atrUrlImagen:
+                  grupo.imagen == null
+                      ? ''
+                      : context.read<Gruposviewmodel>().urlImagen(
+                        grupo.imagen!,
+                      ),
+              atrDescripcion: _descripcionHorarios(horarios.datos),
             );
           },
         ),
-        Consumer<Inscripcionviewmodel>(
-          builder: (context, vm, _) {
-            return FutureBuilder<bool>(
-              future: vm.validarInscripcion(inscripcion),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return Center(child: CircularProgressIndicator());
-                }
-                bool estado = snapshot.data!;
-                return Positioned(
-                  top: 165,
-                  child: FilledButton.icon(
-                    label: Text(estado ? 'Quitar matrícula' : 'Matricular'),
-                    icon: Icon(estado ? Icons.cancel : Icons.view_agenda),
-                    style: FilledButton.styleFrom(
-                      backgroundColor:
-                          estado ? ColorTheme.error : ColorTheme.secondary,
-                    ),
-                    onPressed: () async {
-                      if (estado) {
-                        await vm.desvincularInscripcion(inscripcion);
-                      } else {
-                        await vm.agregarIncripcion(inscripcion);
-                        if (vm.cargando) {
-                          showDialog(
-                            context: context,
-                            builder: (_) {
-                              return DialogCargando();
-                            },
-                          );
-                        }
-                        if (vm.codigoInsercion == 201) {
-                          showDialog(
-                            context: context,
-                            builder: (_) {
-                              return DialogExito(
-                                titulo: "Operacion exitosa",
-                                mensaje: "Te has inscrito al grupo",
-                              );
-                            },
-                          );
-                        }
-                        if (vm.error != null) {
-                          showDialog(
-                            context: context,
-                            builder: (_) {
-                              return DialogError(
-                                codigo: vm.codigoInsercion ?? 0,
-                                mensaje: vm.error ?? "Error desconocido",
-                                titulo: "Error en la operacion",
-                              );
-                            },
-                          );
-                        }
-                      }
-                    },
-                  ),
+        Builder(
+          builder: (context) {
+            final estado = context
+                .select<Inscripcionviewmodel, EstadoSeccion<bool>>(
+                  (vm) => vm.estadoDe(grupo),
                 );
-              },
+            final procesando = context.select<Inscripcionviewmodel, bool>(
+              (vm) => vm.procesando(grupo),
+            );
+            final enEspera = context.select<Inscripcionviewmodel, bool>(
+              (vm) => vm.enEspera(grupo),
+            );
+            if (estado.cargando) {
+              return Center(child: CircularProgressIndicator());
+            }
+            //sin poder consultar no se sabe si esta inscrito: no se ofrece
+            //Matricular ni Quitar matricula, solo volver a consultar (IN-09)
+            if (estado.error != null) {
+              return Positioned(
+                top: 165,
+                child: Column(
+                  children: [
+                    Text(
+                      'No se pudo consultar tu inscripción',
+                      style: Tipografia.cuerpo2(color: ColorTheme.error),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Reintentar'),
+                      onPressed:
+                          () => context.read<Inscripcionviewmodel>().reintentar(
+                            _inscripcionDe(grupo),
+                          ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            if (enEspera) {
+              return _tarjetaEnEspera(grupo, procesando);
+            }
+            final bool inscrito = estado.datos;
+            return Positioned(
+              top: 165,
+              child: FilledButton.icon(
+                label: Text(inscrito ? 'Quitar matrícula' : 'Matricular'),
+                icon: Icon(inscrito ? Icons.cancel : Icons.view_agenda),
+                style: FilledButton.styleFrom(
+                  backgroundColor:
+                      inscrito ? ColorTheme.error : ColorTheme.secondary,
+                ),
+                //deshabilitado mientras su operacion esta en camino (J4)
+                onPressed:
+                    procesando
+                        ? null
+                        : () => _matricularODesvincular(grupo, inscrito),
+              ),
             );
           },
         ),
       ],
     );
+  }
+
+  //quien esta en la lista no puede volver a matricularse: solo salir (IN-15)
+  Widget _tarjetaEnEspera(Grupoentidad grupo, bool procesando) {
+    return Positioned(
+      top: 165,
+      child: Column(
+        children: [
+          Text(
+            'En lista de espera',
+            style: Tipografia.cuerpo2(color: ColorTheme.secondary),
+          ),
+          FilledButton.icon(
+            label: const Text('Salir de la lista'),
+            icon: const Icon(Icons.cancel),
+            style: FilledButton.styleFrom(backgroundColor: ColorTheme.error),
+            onPressed: procesando ? null : () => _salirDeLaLista(grupo),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _salirDeLaLista(Grupoentidad grupo) async {
+    final resultado = await context
+        .read<Inscripcionviewmodel>()
+        .desvincularInscripcion(_inscripcionDe(grupo));
+    await _mostrarResultado(
+      resultado,
+      mensajeExito: 'Saliste de la lista de espera',
+    );
+  }
+
+  Future<void> _matricularODesvincular(Grupoentidad grupo, bool inscrito) async {
+    final vm = context.read<Inscripcionviewmodel>();
+    final inscripcion = _inscripcionDe(grupo);
+    final resultado =
+        inscrito
+            ? await vm.desvincularInscripcion(inscripcion)
+            : await vm.agregarIncripcion(inscripcion);
+    await _mostrarResultado(
+      resultado,
+      mensajeExito:
+          inscrito
+              ? 'Se quito tu matricula del grupo'
+              : 'Te has inscrito al grupo',
+    );
+  }
+
+  Inscripcionentidad _inscripcionDe(Grupoentidad grupo) => Inscripcionentidad(
+    alumnoId: widget.alumnoId,
+    categoria: grupo.categoria,
+    curso: grupo.curso,
+    anio: grupo.anio,
+    iterable: grupo.iterable,
+  );
+
+  //sin horarios (o si su peticion fallo) la tarjeta queda sin descripcion
+  String _descripcionHorarios(List<Horarioentidad> horarios) {
+    String descripcion = '';
+    for (Horarioentidad horario in horarios) {
+      descripcion =
+          descripcion +
+          '${DiaSemana.etiqueta(horario.dia)}: ${horario.horaInicio} - ${horario.horaFin} \n';
+    }
+    return descripcion;
+  }
+
+  //el vm ya interpreto la respuesta: la vista solo decide que mostrar, y
+  //espera el dialogo para no usar un context que ya no sirve
+  Future<void> _mostrarResultado(
+    Resultado<bool> resultado, {
+    required String mensajeExito,
+  }) async {
+    if (!mounted) return;
+    switch (resultado) {
+      case Exito(:final datos):
+        await showDialog(
+          context: context,
+          builder:
+              (_) => DialogExito(
+                titulo: "Operacion exitosa",
+                //datos: el alumno quedo en lista de espera (BK-06)
+                mensaje:
+                    datos == true
+                        ? "El grupo no tiene cupos: quedaste en la lista de espera"
+                        : mensajeExito,
+              ),
+        );
+      case Fallo(:final codigo, :final mensaje):
+        await showDialog(
+          context: context,
+          builder:
+              (_) => DialogError(
+                codigo: codigo,
+                mensaje: mensaje,
+                titulo: "Error en la operacion",
+              ),
+        );
+    }
   }
 }

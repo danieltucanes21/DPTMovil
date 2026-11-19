@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 import 'package:dpt_movil/domain/entities/PerfilEntidad.dart';
 import 'package:dpt_movil/domain/servicios/servicioAutenticacion.dart';
@@ -5,8 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class AutenticacionViewModel with ChangeNotifier {
-  final Servicioautenticacion _servicio = Servicioautenticacion();
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+  //unico vm global (la sesion la leen el menu lateral y casi todas las
+  //pantallas). Ambas dependencias llegan desde la raiz: el servicio y el
+  //cliente de Google, que en los tests se reemplaza por un doble
+  final Servicioautenticacion _servicio;
+  final GoogleSignIn _googleSignIn;
 
   GoogleSignInAccount? cuenta;
   PerfilEntidad? perfilSesion;
@@ -14,10 +19,17 @@ class AutenticacionViewModel with ChangeNotifier {
   String? _correoAutenticado;
   String? _nombreAutenticado;
 
-  AutenticacionViewModel();
+  AutenticacionViewModel(this._servicio, this._googleSignIn);
 
   String? get correoAutenticado => _correoAutenticado ?? cuenta?.email;
   String? get nombreAutenticado => _nombreAutenticado ?? cuenta?.displayName;
+  String? get fotoPerfil => cuenta?.photoUrl;
+
+  //valor de la cabecera Authorization para lo que no pasa por el Dio
+  String? get autorizacion {
+    final token = _servicio.tokenSesion;
+    return token == null ? null : 'Bearer $token';
+  }
 
   Future<void> verificarSesion() async {
     if (cuenta != null) {
@@ -40,8 +52,12 @@ class AutenticacionViewModel with ChangeNotifier {
   Future<bool> loginGoogle() async {
     error = null;
     try {
+
       cuenta = await _googleSignIn.signIn();
       if (cuenta != null) {
+        print("PHOTO URL: ${cuenta!.photoUrl}");
+        print(" Login exitoso");
+        print("Email: ${cuenta!.email}");
         _correoAutenticado = cuenta!.email;
         _nombreAutenticado = cuenta!.displayName;
         error = null;
@@ -73,7 +89,14 @@ class AutenticacionViewModel with ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await _googleSignIn.signOut();
+    //primero el JWT: sin el, ninguna peticion sale autenticada
+    _servicio.cerrarSesion();
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {
+      //si el plugin falla, la sesion local se borra igual (AU-04): la de
+      //Google se renueva en verificarSesion o en el proximo inicio
+    }
     cuenta = null;
     perfilSesion = null;
     _correoAutenticado = null;
@@ -81,7 +104,14 @@ class AutenticacionViewModel with ChangeNotifier {
     notifyListeners();
   }
 
+  //con cuenta de Google: el backend exige su ID Token (POST /auth/token) y
+  //devuelve el perfil y el JWT de la sesion. Solo con correo: GET /login,
+  //que el backend nuevo rechaza con 401 sin JWT (AU-B01)
   Future<RespuestaModelo> login() async {
+    final cuentaGoogle = cuenta;
+    if (cuentaGoogle != null) {
+      return _loginConGoogle(cuentaGoogle);
+    }
     try {
       final correo = correoAutenticado;
       if (correo == null || correo.isEmpty) {
@@ -109,12 +139,44 @@ class AutenticacionViewModel with ChangeNotifier {
     }
   }
 
+  Future<RespuestaModelo> _loginConGoogle(GoogleSignInAccount cuentaGoogle) async {
+    try {
+      final idToken = (await cuentaGoogle.authentication).idToken;
+      if (idToken == null || idToken.isEmpty) {
+        return RespuestaModelo.fromException(
+          Exception('Google no entrego el ID Token: revisa el serverClientId'),
+          "POST",
+          "auth/token",
+          "viewmodel",
+        );
+      }
+      RespuestaModelo respuesta = await _servicio.iniciarSesionConGoogle(idToken);
+      if (respuesta.codigoHttp == 200 && respuesta.datos != null) {
+        perfilSesion = respuesta.datos as PerfilEntidad;
+        notifyListeners();
+      }
+      return respuesta;
+    } on Exception catch (exception) {
+      return RespuestaModelo.fromException(
+        exception,
+        "POST",
+        "auth/token",
+        "viewmodel",
+      );
+    }
+  }
+
   Future<RespuestaModelo> registroAlumno(PerfilEntidad entidad) async {
     try {
       RespuestaModelo respuesta = await _servicio.registro(entidad);
       if (respuesta.codigoHttp == 201) {
         perfilSesion = respuesta.datos as PerfilEntidad;
         notifyListeners();
+        //el registro es publico y no da JWT: con Google se pide ahora, para
+        //que las pantallas del alumno no respondan 401
+        if (cuenta != null) {
+          await login();
+        }
       }
       return respuesta;
     } on Exception catch (exception) {
@@ -125,5 +187,63 @@ class AutenticacionViewModel with ChangeNotifier {
         "View model",
       );
     }
+  }
+
+  //mensaje legible de un registro rechazado. El backend responde 422 con un
+  //motivo si faltan datos del tipo de vinculo (llega como texto), 400 con un
+  //mensaje por campo si falla la validacion (llega como JSON), 409 si la
+  //identificacion ya existe
+  String mensajeErrorRegistro(RespuestaModelo respuesta) {
+    final texto = respuesta.error?.mensaje;
+    if (texto != null && texto.isNotEmpty) {
+      try {
+        final cuerpo = jsonDecode(texto);
+        if (cuerpo is Map) {
+          final campos = cuerpo.values.whereType<String>().toList();
+          if (campos.isNotEmpty) return campos.join('\n');
+        }
+      } on FormatException {
+        //el motivo del backend tal cual, sea cual sea el codigo: un 409 dice
+        //que perfil ya existe (AU-06). "Los datos enviados no son validos,
+        //<motivo>": se deja el motivo
+        final coma = texto.indexOf(', ');
+        return coma >= 0 && texto.startsWith('Los datos enviados')
+            ? texto.substring(coma + 2)
+            : texto;
+      }
+    }
+    switch (respuesta.codigoHttp) {
+      case 409:
+        return 'Ya existe un perfil con esa identificacion o correo';
+      case 503:
+        return 'No hay conexion con el servidor';
+      case 408:
+        return 'El servidor tardo demasiado en responder';
+      default:
+        return 'No se pudo completar el registro (${respuesta.codigoHttp})';
+    }
+  }
+
+  //mensaje legible de un inicio de sesion fallido que no es 404 (AU-08). El
+  //401 sin cuerpo de /login es lo que responde el backend nuevo a quien entra
+  //solo con el correo (BK-11); de /auth/token, que rechazo el ID Token
+  String mensajeErrorLogin(RespuestaModelo respuesta) {
+    switch (respuesta.codigoHttp) {
+      case 401:
+        return cuenta == null
+            ? 'El servidor ya no permite iniciar sesión solo con el correo. Usa «Continuar con Google».'
+            : 'El servidor no aceptó tu cuenta de Google. Intenta iniciar sesión de nuevo.';
+      case 403:
+        return 'Tu cuenta no tiene permiso para entrar a la aplicación.';
+      case 503:
+        return 'No hay conexión con el servidor. Revisa tu red e intenta de nuevo.';
+      case 408:
+        return 'El servidor tardó demasiado en responder. Intenta de nuevo.';
+    }
+    final texto = respuesta.error?.mensaje;
+    if (texto != null && texto.trim().isNotEmpty) {
+      return 'No se pudo iniciar sesión: $texto';
+    }
+    return 'No se pudo iniciar sesión (código ${respuesta.codigoHttp}).';
   }
 }

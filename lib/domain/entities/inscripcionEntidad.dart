@@ -1,6 +1,7 @@
-import 'package:dpt_movil/data/models/inscripcionModelo.dart';
-
 class Inscripcionentidad {
+  //estado que da el backend a una inscripcion en un grupo sin cupos
+  static const String estadoEnEspera = 'EN_ESPERA';
+
   DateTime? fechaInscripcion;
 
   DateTime? fechaDesvinculacion;
@@ -24,16 +25,4 @@ class Inscripcionentidad {
     required this.anio,
     required this.iterable,
   });
-
-  factory Inscripcionentidad.fromModelo(Inscripcionmodelo modelo) {
-    return Inscripcionentidad(
-      alumnoId: modelo.alumnoId,
-      categoria: modelo.categoria,
-      curso: modelo.curso,
-      anio: modelo.anio,
-      iterable: modelo.iterable,
-      fechaInscripcion: modelo.fechaInscripcion,
-      fechaDesvinculacion: modelo.fechaDesvinculacion,
-    );
-  }
 }

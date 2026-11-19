@@ -1,12 +1,14 @@
 import 'package:dio/dio.dart';
-import 'package:dpt_movil/config/configServicio.dart';
 import 'package:dpt_movil/data/api/conexion/interfaces/ConexionClases.dart';
 import 'package:dpt_movil/data/models/claseModelo.dart';
 import 'package:dpt_movil/data/models/errorModelo.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 
 class Conexionclasesremoto implements Conexionclases {
-  final _dio = Dio(BaseOptions(baseUrl: ConfigServicio().obtenerBaseApi()));
+  //el Dio compartido llega desde la raiz de composicion, con la baseUrl
+  final Dio _dio;
+
+  Conexionclasesremoto(this._dio);
 
   @override
   Future<RespuestaModelo> obtenerClasesGrupo(
@@ -16,10 +18,17 @@ class Conexionclasesremoto implements Conexionclases {
     int iterable,
   ) async {
     String metodo = "GET";
-    String path =
-        '/clasesGrupo?categoria=$categoria&curso=$curso&anio=$anio&iterable=$iterable';
+    String path = '/clasesGrupo';
     try {
-      final response = await _dio.get(path);
+      final response = await _dio.get(
+        path,
+        queryParameters: {
+          'categoria': categoria,
+          'curso': curso,
+          'anio': anio,
+          'iterable': iterable,
+        },
+      );
       if (response.statusCode != 200) {
         return RespuestaModelo.fromResponse(response, metodo);
       }
@@ -48,8 +57,8 @@ class Conexionclasesremoto implements Conexionclases {
         path,
         'conexion',
       );
-    } on Exception catch (error) {
-      return RespuestaModelo.fromException(error, metodo, path, 'conexion');
+    } catch (error) {
+      return RespuestaModelo.fromObjectError(error, metodo, path, 'conexion');
     }
   }
 
@@ -63,10 +72,12 @@ class Conexionclasesremoto implements Conexionclases {
         data: modelo,
         options: Options(contentType: 'application/json'),
       );
-      if (response.statusCode != 201) {
+      //201: clase nueva. 200: el backend reutilizo la clase que ya existia en
+      //esa fecha, no es un error (BK-08). El vm distingue los dos casos
+      if (response.statusCode != 201 && response.statusCode != 200) {
         return RespuestaModelo.fromResponse(response, metodo);
       }
-      return RespuestaModelo(codigoHttp: 201);
+      return RespuestaModelo(codigoHttp: response.statusCode!);
     } on DioException catch (dioError) {
       return RespuestaModelo.fromDioException(dioError, metodo);
     } on FormatException catch (formatError) {
@@ -76,8 +87,8 @@ class Conexionclasesremoto implements Conexionclases {
         path,
         'conexion',
       );
-    } on Exception catch (error) {
-      return RespuestaModelo.fromException(error, metodo, path, 'conexion');
+    } catch (error) {
+      return RespuestaModelo.fromObjectError(error, metodo, path, 'conexion');
     }
   }
 
@@ -100,8 +111,8 @@ class Conexionclasesremoto implements Conexionclases {
         path,
         'conexion',
       );
-    } on Exception catch (error) {
-      return RespuestaModelo.fromException(error, metodo, path, 'conexion');
+    } catch (error) {
+      return RespuestaModelo.fromObjectError(error, metodo, path, 'conexion');
     }
   }
 }

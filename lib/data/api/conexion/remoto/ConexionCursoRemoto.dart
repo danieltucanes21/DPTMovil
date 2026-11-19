@@ -1,63 +1,25 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:dpt_movil/config/configServicio.dart';
 import 'package:dpt_movil/data/api/conexion/interfaces/ConexionCurso.dart';
-import 'package:dpt_movil/data/api/conexion/remoto/ConexionImagenRemoto.dart';
+import 'package:dpt_movil/data/api/conexion/interfaces/ConexionImagen.dart';
 import 'package:dpt_movil/data/models/cursoModelo.dart';
 import 'package:dpt_movil/data/models/errorModelo.dart';
 import 'package:dpt_movil/data/models/imagenModelo.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
-import 'package:flutter/material.dart';
 
 class ConexionCursoRemoto implements ConexionCurso {
-  final _dio = Dio(BaseOptions(baseUrl: ConfigServicio().obtenerBaseApi()));
+  //ambas llegan desde la raiz de composicion: el Dio compartido (con la
+  //baseUrl y los timeouts) y la conexion de imagenes, compartida con categoria
+  final Dio _dio;
+  final Conexionimagen _conexionImagen;
 
+  ConexionCursoRemoto(this._dio, this._conexionImagen);
+
+  //misma baseUrl que las peticiones de esta conexion
   @override
-  Future<List<CursoModelo>> obtenerCursos() async {
-    //intentar hacer la peticion
-    try {
-      print(_dio.options.baseUrl);
-      final response = await _dio.get('/cursos');
-      print(response.realUri);
-
-      //se espera codigo 200 para la peticion, si no manejar error
-      if (response.statusCode != 200) {
-        //TODO: no se ha sido exitosa la carga de informacion, manejar error
-        return Future.value(null);
-      }
-
-      //el response data para este caso retorna una lista de categorias
-      //tener en cuenta que la estructura puede cambiar
-      List<dynamic> data = response.data;
-
-      //se construye la lista segun el modelo, para ello se usa factory para construir cada categoria a partir de un json
-      List<CursoModelo> cursos =
-          data.map((json) => CursoModelo.fromJson(json)).toList();
-
-      return cursos;
-    } on DioException catch (dioError) {
-      print('>>>>>>>>>>>>>Excepcion dio: ${dioError.message}');
-      if (dioError.type == DioExceptionType.connectionTimeout) {
-        throw Exception('>>>>>>>>>>>>>>>>Connection Timeout Exception');
-      } else if (dioError.type == DioExceptionType.receiveTimeout) {
-        throw Exception('>>>>>>>>>>>>>>>>>Receive Timeout Exception');
-      } else if (dioError.type == DioExceptionType.badResponse) {
-        throw Exception(
-          '>>>>>>>>>>>>>>>>>>>Received invalid status code: ${dioError.response?.statusCode}',
-        );
-      } else {
-        throw Exception(
-          '>>>>>>>>>>>>>>>>Unexpected error: ${dioError.message}',
-        );
-      }
-    } catch (e) {
-      //TODO: manejar cualquier otro error, si no se ha cargado la informacion no se puede continuar con la aplicacion, sugerir soporte tecnico
-      print('error: $e');
-      //TODO: error fatal, en este caso no se puede continuar con la ejecucion, direccionar a una vista de error y sugerir comunicacion con el soporte
-      return Future.value(null);
-    }
-  }
+  String urlImagen(int idImagen) =>
+      '${_dio.options.baseUrl}/imagenStream?idImagen=$idImagen';
 
   @override
   Future<RespuestaModelo> agregarCurso(CursoModelo curso) async {
@@ -65,9 +27,8 @@ class ConexionCursoRemoto implements ConexionCurso {
     String metodo = "POST";
     String capa = "Conexion";
     try {
-      Conexionimagenremoto conexionImagen = Conexionimagenremoto();
       //se inserta la imagen
-      RespuestaModelo responseImagen = await conexionImagen.insertarImagenFile(
+      RespuestaModelo responseImagen = await _conexionImagen.insertarImagenFile(
         curso.imagenFile!,
       );
       if (responseImagen.codigoHttp != 201) {
@@ -80,8 +41,9 @@ class ConexionCursoRemoto implements ConexionCurso {
         data: curso,
         options: Options(contentType: ContentType.json.toString()),
       );
+      //Dio ya lanza con 4xx/5xx; esto cubre un 2xx distinto de 201
       if (response.statusCode != 201) {
-        RespuestaModelo.fromResponse(response, metodo);
+        return RespuestaModelo.fromResponse(response, metodo);
       }
       CursoModelo respuesta = CursoModelo.fromJson(response.data);
       return RespuestaModelo(
@@ -93,8 +55,8 @@ class ConexionCursoRemoto implements ConexionCurso {
       return RespuestaModelo.fromDioException(dioExc, metodo);
     } on FormatException catch (exception) {
       return RespuestaModelo.fromFormatException(exception, metodo, path, capa);
-    } on Exception catch (exception) {
-      return RespuestaModelo.fromException(exception, metodo, path, capa);
+    } catch (exception) {
+      return RespuestaModelo.fromObjectError(exception, metodo, path, capa);
     }
   }
 
@@ -109,8 +71,10 @@ class ConexionCursoRemoto implements ConexionCurso {
     String metodo = "GET";
     //intentar hacer la peticion
     try {
+      //la categoria viaja como parametro: un "&" o un "+" en el titulo no la corta (CU-02)
       final response = await _dio.get(
-        '/cursosbycategoria?prmCategoria=$tituloCategoria',
+        '/cursosbycategoria',
+        queryParameters: {'prmCategoria': tituloCategoria},
       );
 
       //se espera codigo 200 para la peticion, si no manejar error
@@ -138,32 +102,25 @@ class ConexionCursoRemoto implements ConexionCurso {
       return RespuestaModelo(codigoHttp: 200, datos: cursos, error: null);
     } on DioException catch (dioError) {
       return RespuestaModelo.fromDioException(dioError, metodo);
-    } on Exception catch (exc) {
-      return RespuestaModelo(
-        codigoHttp: 0,
-        datos: null,
-        error: ErrorModelo(
-          codigoHttp: 0,
-          mensaje: 'Error fuera de la conexion: ${exc.toString()}',
-          url: '',
-          metodo: metodo,
-        ),
+    } catch (error) {
+      return RespuestaModelo.fromObjectError(
+        error,
+        metodo,
+        'cursos',
+        'conexion',
       );
     }
-  }
-
-  @override
-  Future<RespuestaModelo> encontrarTodosCursos() {
-    // TODO: implement encontrarTodosCursos
-    throw UnimplementedError();
   }
 
   @override
   Future<RespuestaModelo> obtenerCurso(String categoria, String curso) async {
     final String metodo = "GET";
     try {
-      String path = '/curso?prmCategoria=$categoria&prmCurso=$curso';
-      final response = await _dio.get(path);
+      String path = '/curso';
+      final response = await _dio.get(
+        path,
+        queryParameters: {'prmCategoria': categoria, 'prmCurso': curso},
+      );
       //se espera codigo 200 para la peticion, si no manejar error
       if (response.statusCode != 200) {
         return RespuestaModelo.fromResponse(response, metodo);
@@ -172,16 +129,12 @@ class ConexionCursoRemoto implements ConexionCurso {
       return RespuestaModelo(codigoHttp: 200, datos: modelo);
     } on DioException catch (dioError) {
       return RespuestaModelo.fromDioException(dioError, metodo);
-    } on Exception catch (exc) {
-      return RespuestaModelo(
-        codigoHttp: 0,
-        datos: null,
-        error: ErrorModelo(
-          codigoHttp: 0,
-          mensaje: 'Error fuera de la conexion: ${exc.toString()}',
-          url: '',
-          metodo: metodo,
-        ),
+    } catch (error) {
+      return RespuestaModelo.fromObjectError(
+        error,
+        metodo,
+        'cursos',
+        'conexion',
       );
     }
   }

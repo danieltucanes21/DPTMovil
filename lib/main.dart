@@ -1,22 +1,8 @@
-import 'package:dpt_movil/presentation/viewmodels/alumnosViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/atencionViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/autenticacionViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/clasesViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/deporteViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/facultadesViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/gruposViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/horariosViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/imagenViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/inscripcionViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/instructores_view_model.dart';
+import 'package:dpt_movil/config/inyeccion/dependencias.dart';
 import 'package:flutter/material.dart';
 import 'package:dpt_movil/config/routes/app_rutas.dart';
 import 'package:dpt_movil/config/routes/route_generator.dart';
 import 'package:dpt_movil/config/theme/app_tema.dart';
-import 'package:dpt_movil/domain/servicios/servicioCategoria.dart';
-import 'package:dpt_movil/presentation/viewmodels/categoriaViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/cursosViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/estadisticasViewModel.dart';
 import 'package:provider/provider.dart';
 
 void main() {
@@ -30,27 +16,17 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => CategoriaViewModel()),
-        ChangeNotifierProvider(create: (_) => CursosViewModel()),
-        ChangeNotifierProvider(create: (_) => EstadisticasViewModel()),
-        ChangeNotifierProvider(create: (_) => Gruposviewmodel()),
-        ChangeNotifierProvider(create: (_) => Horariosviewmodel()),
-        ChangeNotifierProvider(create: (_) => Alumnosviewmodel()),
-        ChangeNotifierProvider(create: (_) => Atencionviewmodel()),
-        ChangeNotifierProvider(create: (_) => Clasesviewmodel()),
-        ChangeNotifierProvider(create: (_) => Imagenviewmodel()),
-        ChangeNotifierProvider(create: (_) => Deporteviewmodel()),
-        ChangeNotifierProvider(create: (_) => AutenticacionViewModel()),
-        ChangeNotifierProvider(create: (_) => Facultadesviewmodel()),
-        ChangeNotifierProvider(create: (_) => Inscripcionviewmodel()),
-        ChangeNotifierProvider(create: (_) => InstructoresViewModel()),
-      ],
+      //datos antes que vms: ver lib/config/inyeccion/dependencias.dart
+      providers: [...proveedoresDatos(), ...vmsGlobales()],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Deporte para todos',
         theme: AppTheme().theme(),
-        initialRoute: AppRutas.page1,
+        initialRoute: AppRutas.categorias,
+        //una sola ruta inicial: por defecto flutter trata '/categorias' como
+        //enlace profundo y apila antes '/', que tambien abre categorias
+        onGenerateInitialRoutes:
+            (ruta) => [generateRoute(RouteSettings(name: ruta))],
         onGenerateRoute: generateRoute,
       ),
     );

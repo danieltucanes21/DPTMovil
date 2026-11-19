@@ -31,7 +31,7 @@ class RespuestaModelo {
           datos: null,
           error: ErrorModelo(
             codigoHttp: 400,
-            mensaje: response.data,
+            mensaje: _textoDe(response),
             url: url,
             metodo: metodo,
           ),
@@ -42,7 +42,7 @@ class RespuestaModelo {
           datos: null,
           error: ErrorModelo(
             codigoHttp: 409,
-            mensaje: response.data,
+            mensaje: _textoDe(response),
             url: url,
             metodo: metodo,
           ),
@@ -53,7 +53,7 @@ class RespuestaModelo {
           datos: null,
           error: ErrorModelo(
             codigoHttp: 500,
-            mensaje: response.data,
+            mensaje: _textoDe(response),
             url: url,
             metodo: metodo,
           ),
@@ -77,13 +77,44 @@ class RespuestaModelo {
           datos: null,
           error: ErrorModelo(
             codigoHttp: 0,
-            mensaje: response.data,
+            mensaje: _textoDe(response),
             url: url,
             metodo: metodo,
           ),
         );
     }
   }
+  //el cuerpo de una respuesta no siempre es texto: un 2xx inesperado suele
+  //traer un Map, que como mensaje lanzaba un TypeError (CAT-07, BK-08)
+  static String _textoDe(Response<dynamic> response) {
+    final datos = response.data;
+    return datos is String
+        ? datos
+        : 'Respuesta inesperada del servidor. Código: ${response.statusCode}';
+  }
+
+  //el motivo de un rechazo para mostrarlo tal cual: el `mensaje` del backend, no
+  //el JSON entero (IN-16). Un 400 por campo sigue como JSON: DialogError lista
+  //cada campo. Sin cuerpo, como el 401 y el 403, se explica por el codigo (IN-17)
+  static String _motivoDe(Response<dynamic>? response) {
+    final cuerpo = response?.data;
+    if (cuerpo is Map) {
+      final mensaje = cuerpo['mensaje'];
+      if (mensaje is String && mensaje.trim().isNotEmpty) return mensaje;
+    }
+    if (cuerpo != null && response.toString().trim().isNotEmpty) {
+      return response.toString();
+    }
+    switch (response?.statusCode) {
+      case 401:
+        return 'Tu sesión no está activa. Inicia sesión de nuevo.';
+      case 403:
+        return 'No tienes permiso para realizar esta acción.';
+      default:
+        return 'El servidor no dio más detalle. Código: ${response?.statusCode}';
+    }
+  }
+
   factory RespuestaModelo.fromDioException(
     DioException excepcion,
     String metodo,
@@ -113,6 +144,7 @@ class RespuestaModelo {
           ),
         );
       case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
         return RespuestaModelo(
           codigoHttp: 408,
           datos: null,
@@ -140,7 +172,7 @@ class RespuestaModelo {
           datos: null,
           error: ErrorModelo(
             codigoHttp: excepcion.response?.statusCode ?? 500,
-            mensaje: excepcion.response.toString(),
+            mensaje: _motivoDe(excepcion.response),
             url: url,
             metodo: metodo,
           ),

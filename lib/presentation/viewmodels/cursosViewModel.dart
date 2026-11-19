@@ -1,148 +1,106 @@
+import 'dart:io';
+
 import 'package:dpt_movil/data/models/errorModelo.dart';
 import 'package:dpt_movil/domain/entities/categoriaEntidad.dart';
-import 'package:flutter/material.dart';
+import 'package:dpt_movil/domain/entities/resultado.dart';
+import 'package:flutter/foundation.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 import 'package:dpt_movil/domain/entities/cursoEntidad.dart';
 import 'package:dpt_movil/domain/servicios/servicioCurso.dart';
-import 'package:dpt_movil/presentation/view/widgets/dialogError.dart';
 
 class CursosViewModel with ChangeNotifier {
   //servicio a usar
   final ServicioCurso servicioCurso;
   //lista de cursos
   List<CursoEntidad>? _listaCursos;
-  //lista entradas para el desplegable
-  List<DropdownMenuEntry> _listaEntradas = [];
+  //nombres para el desplegable "desplazar a". Son datos, no widgets: la
+  //vista arma sus DropdownMenuEntry
+  List<String> _nombres = const [];
   //get para acceder a la lista
   List<CursoEntidad>? get getListaCursos => _listaCursos;
-  //get para acceder a la lista de entradas para el desplegable
-  List<DropdownMenuEntry> get getListaEntradas => _listaEntradas;
+  List<String> get nombresCursos => _nombres;
 
-  //constructor
-  CursosViewModel() : servicioCurso = ServicioCurso();
+  //mientras llega la lista: sin esto la vista no distingue "cargando" de
+  //"la categoria no tiene cursos"
+  bool _cargando = false;
+  bool get cargando => _cargando;
 
-  Future<void> cargarListaCursos() async {
-    try {
-      _listaCursos = await servicioCurso.call();
-      _cargarEntradas();
-      notifyListeners();
-    } catch (e) {
-      print('error en CursosViewModel: $e');
+  //el servicio sale de la raiz; el vm lo crea cada ruta (route_generator)
+  CursosViewModel(this.servicioCurso);
+
+  //url de la imagen de un curso: la vista no conoce la direccion del servidor
+  String urlImagen(int idImagen) => servicioCurso.urlImagen(idImagen);
+
+  //punto de entrada del formulario: aplica las reglas que antes vivian en la
+  //vista (deporte e imagen obligatorios), arma la entidad y la registra. La
+  //vista entrega lo que hay en pantalla y recibe exito o fallo ya resueltos
+  Future<Resultado<CursoEntidad>> guardarCurso({
+    required String nombre,
+    required String descripcion,
+    required String categoria,
+    String? deporte,
+    File? imagenNueva,
+    CursoEntidad? original, //null = crear
+  }) async {
+    //no hay operacion de edicion en el servicio (VM-e); ninguna pantalla abre
+    //el formulario en modo edicion, pero si llega se dice en vez de callar
+    if (original != null) {
+      return Fallo(0, 'La edicion de cursos aun no esta disponible', origen: 'ViewModel');
     }
+    if (deporte == null) {
+      return Fallo(0, 'Selecciona un deporte por favor', origen: 'ViewModel');
+    }
+    if (imagenNueva == null) {
+      return Fallo(0, 'Carga una imagen por favor', origen: 'ViewModel');
+    }
+    final entidad = CursoEntidad(
+      nombreCurso: nombre.trim(),
+      nombreDeporte: deporte,
+      tituloCategoria: categoria,
+      descripcion: descripcion.trim(),
+      imagenFile: imagenNueva,
+    );
+    final respuesta = await agregarCurso(entidad);
+    if (respuesta.codigoHttp == 201) {
+      return Exito(respuesta.datos as CursoEntidad?);
+    }
+    return _fallo(respuesta);
   }
 
+  //la excepcion de una capa de abajo vuelve como respuesta, no se lanza: un
+  //curso sin archivo hacia saltar el imagenFile! de la conexion hasta la vista
+  //(CU-03)
   Future<RespuestaModelo> agregarCurso(CursoEntidad entidad) async {
-    RespuestaModelo respuesta = await servicioCurso.insertarCurso(entidad);
-    return respuesta;
-  }
-
-  Future<void> listarTodosCursos(context) async {
-    RespuestaModelo? respuesta;
-    _listaCursos = [];
     try {
-      respuesta = await servicioCurso.listarTodosCursos();
-      switch (respuesta.codigoHttp) {
-        case 200: // respuesta correcta, cargar datos
-          if (respuesta.datos is List<CursoEntidad>) {
-            _listaCursos = respuesta.datos as List<CursoEntidad>;
-          } else {
-            showDialog(
-              context: context,
-              builder: (context) {
-                return DialogError(
-                  titulo: 'datos inconsistentes',
-                  mensaje:
-                      'no se ha obtenido una lista de tipo entidad para cargar los datos',
-                  codigo: 0,
-                );
-              },
-            );
-          }
-          break;
-        case 204: //listado vacio
-          showDialog(
-            context: context,
-            builder: (context) {
-              return DialogError(
-                titulo: 'Exito en la operacion',
-                mensaje:
-                    'Lastimosamente no se encontraron categorias en el sistema',
-                codigo: 204,
-              );
-            },
-          );
-          break;
-        default: //Otro tipo de error reportado
-          showDialog(
-            context: context,
-            builder: (context) {
-              return DialogError(
-                titulo: 'No se pudo obtener datos',
-                mensaje:
-                    respuesta?.error?.mensaje ??
-                    'no hay informacion respecto al error',
-                codigo: respuesta?.codigoHttp ?? 0,
-              );
-            },
-          );
-          break;
-      }
+      return await servicioCurso.insertarCurso(entidad);
     } catch (e) {
-      //error no esperado
-      showDialog(
-        context: context,
-        builder: (context) {
-          return DialogError(
-            titulo: 'excepcion no controlada',
-            mensaje: e.toString(),
-            codigo: 0,
-          );
-        },
-      );
-    } finally {
-      _cargarEntradas();
-      notifyListeners();
+      return RespuestaModelo.fromObjectError(e, 'POST', 'Agregar curso', 'ViewModel');
     }
   }
 
-  Future<void> listarCursosDe(context, CategoriaEntidad categoria) async {
-    RespuestaModelo? respuesta;
-    _listaCursos = [];
+  //la vista recibe exito o fallo ya resueltos y decide si avisa; el vm no
+  //abre dialogos. Un error deja la lista vacia y devuelve un solo Fallo (antes
+  //se abrian dos dialogos seguidos, CU-05)
+  Future<Resultado<void>> listarCursosDe(CategoriaEntidad categoria) async {
+    Resultado<void> resultado = Exito();
+    _cargando = true;
+    notifyListeners();
     try {
-      respuesta = await servicioCurso.listarCursosDe(categoria);
-      if (respuesta.codigoHttp != 200) {
-        _mostrarError(context, "Sin datos", respuesta.error);
-      }
-      if (respuesta.datos is List<CursoEntidad>) {
-        _listaCursos = respuesta.datos as List<CursoEntidad>;
+      final respuesta = await servicioCurso.listarCursosDe(categoria);
+      if (respuesta.codigoHttp == 200 && respuesta.datos is List<CursoEntidad>) {
+        _establecerCursos(respuesta.datos as List<CursoEntidad>);
       } else {
-        _mostrarError(
-          context,
-          "datos inconsistentes",
-          ErrorModelo(
-            codigoHttp: 406,
-            mensaje:
-                'no se ha obtenido una lista de tipo entidad para cargar los datos',
-            url: "cursosbycategoria",
-            metodo: "POST",
-          ),
-        );
+        _establecerCursos([]);
+        resultado = _fallo(respuesta);
       }
     } catch (e) {
-      _mostrarError(
-        context,
-        'excepcion no controlada',
-        ErrorModelo(
-          codigoHttp: 0,
-          mensaje: e.toString(),
-          url: 'cursosbycategoria',
-          metodo: 'GET',
-        ),
-      );
+      _establecerCursos([]);
+      resultado = Fallo(-1, e.toString(), origen: 'ViewModel');
     } finally {
-      _cargarEntradas();
+      _cargando = false;
       notifyListeners();
     }
+    return resultado;
   }
 
   Future<RespuestaModelo> obtenerCurso(String categoria, String curso) async {
@@ -163,36 +121,21 @@ class CursosViewModel with ChangeNotifier {
     }
   }
 
-  void _cargarEntradas() {
-    if (_listaCursos != null && _listaCursos!.isNotEmpty) {
-      _listaEntradas =
-          _listaCursos!.map((curso) {
-            return DropdownMenuEntry(
-              value: curso.nombreCurso,
-              label: curso.nombreCurso,
-            );
-          }).toList();
-    } else {
-      _listaEntradas = [];
-    }
+  //unico punto donde se escribe la lista: los nombres del desplegable salen
+  //siempre de ella
+  void _establecerCursos(List<CursoEntidad> lista) {
+    _listaCursos = lista;
+    _nombres = [for (final curso in lista) curso.nombreCurso];
   }
 
-  void _mostrarError(context, String titulo, ErrorModelo? error) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return (error != null)
-            ? DialogError(
-              titulo: titulo,
-              mensaje: error.mensaje,
-              codigo: error.codigoHttp,
-            )
-            : DialogError(
-              titulo: 'Error sin informacion',
-              mensaje: "Se desconoce el error",
-              codigo: 0,
-            );
-      },
+  //unico punto donde se lee el ErrorModelo de una carga: la vista recibe
+  //codigo y mensaje ya resueltos
+  Fallo<T> _fallo<T>(RespuestaModelo respuesta) {
+    final error = respuesta.error;
+    return Fallo(
+      respuesta.codigoHttp,
+      error?.mensaje ?? 'Error desconocido. Código: ${respuesta.codigoHttp}',
+      origen: error == null ? null : '${error.metodo} ${error.url}',
     );
   }
 }
