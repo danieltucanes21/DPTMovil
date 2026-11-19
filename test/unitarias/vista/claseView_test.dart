@@ -241,6 +241,49 @@ void main() {
     expect(find.text('Abrir clase'), findsOneWidget);
   });
 
+  //AS-13: fuera de la ventana de asistencia la clase solo se consulta
+  testWidgets('$capa - $tipo - Clase - en solo lectura se ven las marcas pero no se cambian ni se guardan', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create:
+                (_) => AutenticacionViewModel(
+                  Servicioautenticacion(
+                    Autenticacionrepositorio(
+                      conexion: ConexionautenticacionFalsa(), almacenToken: AlmacenToken(),
+                    ),
+                  ),
+                  GoogleSignInFalso(),
+                ),
+          ),
+          ChangeNotifierProvider(
+            create:
+                (_) => Atencionviewmodel(
+                  Servicioatencion(Atencionesrepositorio(conexion: conexion)),
+                )..cargarAtenciones(grupo, clase),
+          ),
+        ],
+        child: MaterialApp(
+          home: Claseview(grupo: grupo, clase: clase, soloLectura: true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final checkboxes = tester.widgetList<Checkbox>(find.byType(Checkbox));
+    expect(checkboxes.map((c) => c.value), [false, false, true]);
+    expect(checkboxes.every((c) => c.onChanged == null), isTrue);
+    expect(find.text('Guardar'), findsNothing);
+    expect(find.text('Volver'), findsOneWidget);
+    expect(
+      find.text('Solo lectura: el plazo para tomar asistencia de esta clase terminó'),
+      findsOneWidget,
+    );
+  });
+
   //AS-10: con marcas sin guardar, Cancelar y atras preguntan antes de salir
   group('Cambios sin guardar (AS-10):', () {
     testWidgets('$capa - $tipo - Cancelar - sin cambios sale sin preguntar', (

@@ -6,6 +6,7 @@ import 'package:dpt_movil/domain/entities/cursoEntidad.dart';
 import 'package:dpt_movil/domain/entities/grupoEntidad.dart';
 import 'package:dpt_movil/domain/entities/horarioEntidad.dart';
 import 'package:dpt_movil/domain/entities/resultado.dart';
+import 'package:dpt_movil/domain/entities/ventanaAsistencia.dart';
 import 'package:dpt_movil/domain/servicios/servicioAlumno.dart';
 import 'package:dpt_movil/domain/servicios/servicioClase.dart';
 import 'package:dpt_movil/domain/servicios/servicioCurso.dart';
@@ -29,13 +30,17 @@ class DetalleGrupoViewModel with ChangeNotifier, NotificacionSegura {
   final Servicioalumno _servicioAlumno;
   final Servicioclase _servicioClase;
 
+  //hora actual para la ventana de asistencia (AS-13); las pruebas la fijan
+  final DateTime Function() _reloj;
+
   DetalleGrupoViewModel(
     this.grupo,
     this._servicioCurso,
     this._servicioHorario,
     this._servicioAlumno,
-    this._servicioClase,
-  );
+    this._servicioClase, {
+    DateTime Function()? reloj,
+  }) : _reloj = reloj ?? DateTime.now;
 
   //todas empiezan cargando: la ruta llama a cargar() al crear el vm
   EstadoSeccion<CursoEntidad?> _curso = const EstadoSeccion(null, cargando: true);
@@ -116,8 +121,8 @@ class DetalleGrupoViewModel with ChangeNotifier, NotificacionSegura {
     notifyListeners();
   }
 
-  //publica: la pantalla la vuelve a llamar cuando formularioClase vuelve con
-  //true, y eliminarClase tras el exito
+  //publica: tomarAsistencia la vuelve a llamar tras registrar la clase de hoy,
+  //y eliminarClase tras el exito
   Future<void> cargarClases() async {
     if (!_clases.cargando) {
       _clases = EstadoSeccion(_clases.datos, cargando: true);
@@ -216,6 +221,128 @@ class DetalleGrupoViewModel with ChangeNotifier, NotificacionSegura {
     );
   }
 
+  //--- toma de asistencia (AS-13) ---
+  //las clases las define el horario: «Tomar asistencia» crea la clase de hoy
+  //con las horas del horario y la abre. Ventana: VentanaAsistencia
+
+  //hay un registro de la clase de hoy en camino: un segundo toque no lo repite
+  bool _tomandoAsistencia = false;
+  bool get tomandoAsistencia => _tomandoAsistencia;
+
+  //null: se puede tomar la asistencia de hoy. Si no, por que no, para
+  //mostrarlo debajo del boton. sinLimite: coordinador
+  String? motivoSinAsistencia({required bool sinLimite}) {
+    if (_horarios.cargando) return 'Cargando el horario del grupo...';
+    if (_horarios.error != null) {
+      return 'No se pudo cargar el horario del grupo';
+    }
+    final ahora = _reloj();
+    final delDia = VentanaAsistencia.horariosDelDia(_horarios.datos, ahora);
+    if (delDia.isEmpty) return 'Hoy no hay clase según el horario del grupo';
+    if (VentanaAsistencia.horarioVigente(
+          _horarios.datos,
+          ahora,
+          sinLimite: sinLimite,
+        ) ==
+        null) {
+      return 'Disponible hoy desde las '
+          '${VentanaAsistencia.horaCorta(delDia.first.horaInicio)}';
+    }
+    return null;
+  }
+
+  //la clase de la lista se abre para marcar (true) o solo para consultar
+  bool puedeEditarClase(Claseentidad clase, {required bool sinLimite}) =>
+      VentanaAsistencia.puedeEditar(
+        clase,
+        _horarios.datos,
+        _reloj(),
+        sinLimite: sinLimite,
+      );
+
+  //la clase de hoy: la que ya esta en la lista o una nueva con las horas del
+  //horario. El Exito trae la clase con su codigo, lista para abrir
+  Future<Resultado<Claseentidad>> tomarAsistencia({
+    required bool sinLimite,
+  }) async {
+    if (_tomandoAsistencia) {
+      return Fallo(0, 'Ya se está abriendo la clase de hoy', origen: 'ViewModel');
+    }
+    final motivo = motivoSinAsistencia(sinLimite: sinLimite);
+    if (motivo != null) return Fallo(0, motivo, origen: 'ViewModel');
+    final ahora = _reloj();
+    final existente = _claseDelDia(ahora);
+    if (existente != null) return Exito(existente);
+    final idInstructor = grupo.idInstructor;
+    if (idInstructor == null) {
+      return Fallo(
+        0,
+        'El grupo no tiene instructor asignado',
+        origen: 'ViewModel',
+      );
+    }
+    final horario =
+        VentanaAsistencia.horarioVigente(
+          _horarios.datos,
+          ahora,
+          sinLimite: sinLimite,
+        )!;
+    final duracion = VentanaAsistencia.duracion(horario);
+    _tomandoAsistencia = true;
+    notifyListeners();
+    try {
+      final respuesta = await _servicioClase.guardarClaseGrupo(
+        Claseentidad(
+          idGrupoCategoria: grupo.categoria,
+          idGrupoCurso: grupo.curso,
+          idGrupoAnio: grupo.anio,
+          idGrupoIterable: grupo.iterable,
+          idInstructor: idInstructor,
+          fecha: DateTime(ahora.year, ahora.month, ahora.day),
+          horas: duracion.horas,
+          minutos: duracion.minutos,
+          eliminado: 0,
+        ),
+      );
+      //201: nueva; 200: ya existia (BK-08). En los dos casos se lee de la
+      //lista, que trae el codigo
+      if (respuesta.codigoHttp != 201 && respuesta.codigoHttp != 200) {
+        return Fallo(
+          respuesta.codigoHttp,
+          respuesta.error?.mensaje ?? 'Error desconocido',
+          origen:
+              respuesta.error == null
+                  ? null
+                  : '${respuesta.error!.metodo} ${respuesta.error!.url}',
+        );
+      }
+      await cargarClases();
+      final clase = _claseDelDia(ahora);
+      if (clase == null) {
+        return Fallo(
+          0,
+          'La clase de hoy se registró, pero no aparece en la lista de clases',
+          origen: 'ViewModel',
+        );
+      }
+      return Exito(clase);
+    } catch (e) {
+      return Fallo(-1, e.toString(), origen: 'ViewModel');
+    } finally {
+      _tomandoAsistencia = false;
+      notifyListeners();
+    }
+  }
+
+  Claseentidad? _claseDelDia(DateTime dia) {
+    for (final clase in _clases.datos) {
+      if (VentanaAsistencia.esDelDia(clase, dia)) return clase;
+    }
+    return null;
+  }
+
+  //sin uso en la pantalla desde AS-13 (eliminar clase ya no se ofrece); lo
+  //siguen usando las pruebas remotas que fijan DELETE /clase (CL-01)
   Future<Resultado<void>> eliminarClase(int codigo) async {
     try {
       final respuesta = await _servicioClase.eliminarClase(codigo);

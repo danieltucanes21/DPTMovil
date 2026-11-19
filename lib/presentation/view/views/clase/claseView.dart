@@ -18,8 +18,16 @@ import 'package:provider/provider.dart';
 class Claseview extends StatefulWidget {
   final Grupoentidad grupo;
   final Claseentidad clase;
+  //fuera de la ventana de asistencia (AS-13): se ven las marcas guardadas,
+  //sin poder cambiarlas ni guardar
+  final bool soloLectura;
 
-  const Claseview({super.key, required this.grupo, required this.clase});
+  const Claseview({
+    super.key,
+    required this.grupo,
+    required this.clase,
+    this.soloLectura = false,
+  });
 
   @override
   State<Claseview> createState() => _ClaseviewState();
@@ -91,6 +99,12 @@ class _ClaseviewState extends State<Claseview> {
             margin: EdgeInsets.symmetric(vertical: 10),
             child: Text('Atenciones', style: Tipografia.h6()),
           ),
+          if (widget.soloLectura)
+            Text(
+              'Solo lectura: el plazo para tomar asistencia de esta clase terminó',
+              textAlign: TextAlign.center,
+              style: Tipografia.cuerpo2(color: ColorTheme.secondaryDark),
+            ),
           listadoAlumnos(),
           acciones(),
         ],
@@ -123,6 +137,12 @@ class _ClaseviewState extends State<Claseview> {
   }
 
   Widget acciones() {
+    if (widget.soloLectura) {
+      return FilledButton(
+        onPressed: () => Navigator.maybePop(context),
+        child: const Text('Volver'),
+      );
+    }
     return Container(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -218,7 +238,8 @@ class _ClaseviewState extends State<Claseview> {
               right: 8,
               child: Checkbox(
                 value: atencion.estaAtendido,
-                onChanged: (value) {
+                //en solo lectura el checkbox queda deshabilitado
+                onChanged: widget.soloLectura ? null : (value) {
                   if (value == null) return;
                   context.read<Atencionviewmodel>().marcarAsistencia(
                     index,

@@ -137,14 +137,17 @@ Respuestas del cliente, comunicadas por el equipo, a las preguntas de [entregabl
 | Dónde se valida el día | En la app: «Tomar asistencia» solo está disponible un día que tiene horario |
 | Ventana de «Tomar asistencia» | Desde la **hora de inicio** de la clase según el horario hasta las **23:59** de ese mismo día |
 | Límite de las 23:59 | En la **app y en el backend**. El del backend hay que pedírselo al equipo del backend; fijar la zona `America/Bogota` |
-| «Agregar clase» | **Obsoleto**: se quita el botón y el formulario |
+| «Agregar clase» | **Obsoleto**: se quitó el botón. La ruta `formularioClase`, `Claseformulario` y `Clasesviewmodel` se conservan, sin acceso desde la app, hasta que el cliente decida sobre las clases sin horario |
 | Clase en un día sin horario | **Por validar con el cliente** (hoy el coordinador puede, con justificación, BK-04) |
-| Eliminar clase | Probablemente ya no hace falta; se quitaría con «Agregar clase» |
-| Lista de clases del grupo | **Se mantiene** visible |
+| Eliminar clase | Se quitó de la pantalla. `DetalleGrupoViewModel.eliminarClase` queda porque lo usan las pruebas remotas (CL-01) |
+| Lista de clases del grupo | **Se mantiene** visible. Una clase fuera de la ventana se abre en **solo lectura** |
+| Coordinador | **Sin límite**: toma asistencia desde el inicio del día de clase (sin esperar la hora) y corrige cualquier clase. Como en el backend, que lo exime de su plazo |
 
 **Queda abierto:**
 - Clases sin horario (ver la tabla).
 - El backend ya rechaza una clase futura con 422 `GC-0018` (H-08, observado el 2026-11-05); falta que también rechace tomar asistencia después del día.
+- **El plazo del backend no es el del cliente** (leído en su código el 2026-11-19, sin probar contra el servidor): `VentanaRegistroAsistencia` (SCRUM-80), que `insertarClase` aplica en `POST /claseGrupo`, usa un plazo **mensual**: fin del mes de la clase, o la prórroga que asigna el coordinador (`PlazoCargaAtenciones`) y responden 422 `GC-0019` «El plazo para registrar la asistencia ya venció». El coordinador está exento. Un instructor puede, por tanto, registrar por la API la asistencia de días anteriores del mismo mes. Hay que acordar con el equipo del backend si se cambia ese plazo por la regla de las 23:59.
+- La app crea la clase de hoy con `POST /claseGrupo` y luego la busca en `/clasesGrupo` para tener su código. El backend ya devuelve el `ClaseDto` con el código en el 200/201, pero la conexión lo descarta; leerlo ahorraría la recarga.
 
 ## Transversales (afectan a varios módulos)
 
@@ -171,7 +174,7 @@ Respuestas del cliente, comunicadas por el equipo, a las preguntas de [entregabl
 | AS-10 | Vista | "Cancelar" o atrás descartan las marcas sin avisar | — | **Código + regla pendiente.** Leído en `claseView.dart`; sin prueba hasta conocer la regla del cliente | B | app | **corregido** (2026-11-19): la regla del cliente pide advertir. `Claseview` usa un `PopScope` con `canPop: !hayCambiosSinGuardar` y «Cancelar» llama a `Navigator.maybePop`, así que los dos caminos muestran «Cambios sin guardar» (SEGUIR EDITANDO / SALIR SIN GUARDAR). Pruebas en `test/unitarias/vista/claseView_test.dart` («Cambios sin guardar (AS-10)») |
 | AS-11 | Modelo / VM | Se listan alumnos eliminados o retirados | — | **Código + regla pendiente.** El VM no filtra por `eliminadoestado`; sin prueba | M | backend + cliente | hipótesis (espera la regla 3.4-4; se confirma con el cliente el 2026-11-19) |
 | AS-12 | Conexión | `receiveTimeout` se reporta con código 0 en vez de 408 | `conexion_diagnostico` · AS-12 (`Actual: <0>`) | **Prueba** | B | app | **corregido** (2026-11-06): `RespuestaModelo.fromDioException` responde 408 también para `receiveTimeout` (todas las conexiones). Prueba en `conexionAtencionesErrores_test.dart` |
-| AS-13 | Reglas | Se puede registrar una clase futura o muy antigua, y editarla sin límite | — | **Código + regla pendiente.** No hay ninguna validación de fecha en el flujo; sin prueba | M | app + backend | **requisito por implementar** (2026-11-19): se quita «Agregar clase»; «Tomar asistencia» se habilita los días con clase según el horario, desde la hora de inicio hasta las 23:59. Ver «Reglas del cliente (2026-11-19)» |
+| AS-13 | Reglas | Se puede registrar una clase futura o muy antigua, y editarla sin límite | — | **Código + regla pendiente.** No hay ninguna validación de fecha en el flujo; sin prueba | M | app + backend | **corregido en la app** (2026-11-19): la regla vive en `domain/entities/ventanaAsistencia.dart`. La pantalla del grupo ya no ofrece «Agregar clase» ni eliminar clase; «TOMAR ASISTENCIA» crea la clase de hoy con las horas del horario (`DetalleGrupoViewModel.tomarAsistencia`) y solo se habilita desde la hora de inicio hasta las 23:59 (el coordinador, sin límite de hora). Las demás clases se abren en solo lectura (`ClaseGrupoargumentos.soloLectura`), salvo para el coordinador. Pruebas: `unitarias/dominio/ventanaAsistencia_test.dart`, `unitarias/viewModel/tomarAsistencia_test.dart`, `unitarias/vista/grupoTomarAsistencia_test.dart` y `claseView_test.dart`. **Falta en el backend** el límite de las 23:59; ver «Reglas del cliente (2026-11-19)» |
 | AS-14 | Vista (lista de clases) | Una clase con `fecha` nula revienta la lista de clases | Análisis de tipos: `Clasemodelo.fecha` no es nulo | **Código.** Descartado por los tipos, sin prueba | M | app | **descartado** (se revisa `Clasemodelo.fromJson` en el módulo 3) |
 
 ### Resumen del módulo 1

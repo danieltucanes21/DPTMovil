@@ -203,7 +203,11 @@ Route<dynamic> _construirRuta(RouteSettings settings) {
                   (c) =>
                       Atencionviewmodel(c.read())
                         ..cargarAtenciones(datos.grupo, datos.clase),
-              child: Claseview(grupo: datos.grupo, clase: datos.clase),
+              child: Claseview(
+                grupo: datos.grupo,
+                clase: datos.clase,
+                soloLectura: datos.soloLectura,
+              ),
             ),
       );
 
