@@ -621,7 +621,7 @@ Resultado:
 |---|---|---|---|
 | CAT-16a | Backend / cliente | **Observado:** eliminar una categoría que tiene un curso responde `Exito`, y `/cursosbycategoria` **sigue devolviendo el curso** (1). El borrado es lógico y no arrastra los cursos | Falta la regla: ¿se debe impedir eliminar una categoría con cursos, o hay que ocultarlos también? |
 | CAT-16b | Backend / cliente | **Observado:** tras eliminar una categoría, crear otra con el mismo título da `409 GC-0007` "Ya existe es mismo registro", aunque no aparece en la lista. El coordinador no puede reutilizar el nombre ni ver por qué | Falta la regla de qué hacer con los títulos de categorías eliminadas |
-| CAT-11 | Rutas | `route_generator.dart:30` importa `views/Categorias/CategoriasView.dart`, pero la carpeta en git es `categorias/`: en un sistema que distingue mayúsculas (Linux, CI) no compila | Confirmado leyendo el código y `git ls-files`; en Windows ninguna prueba puede ponerlo en rojo |
+| CAT-11 | Rutas | `route_generator.dart:30` importa `views/Categorias/CategoriasView.dart`, pero la carpeta en git es `categorias/`: en un sistema que distingue mayúsculas (Linux, CI) no compila | Confirmado leyendo el código y `git ls-files`; en Windows ninguna prueba puede ponerlo en rojo. **Corregido** (2026-11-18, commit 5e7f5e8, CI-01): el import usa `views/categorias/CategoriasView.dart`; lo vigila la CI en Linux |
 | CAT-07 | Modelo | `ErrorModelo.mensaje` recibe `response.data` (puede ser un `Map`) en `fromResponse` ante un 2xx inesperado | No se escribió una prueba aparte. **Corregido** (2026-11-05) con BK-08: `fromResponse` ya no pone un `Map` como mensaje |
 | CAT-10 | Vista | El botón de quitar imagen nunca se agrega al `Stack` | Es de la vista |
 
@@ -838,7 +838,7 @@ Ya registrados que afectan a esta lista: **GR-05** (`/alumnosGrupo` sin codifica
 |---|---|---|---|
 | H-08 | Modelo | `eliminadoestado` llega, pero ni la entidad ni el VM lo usan | No hay forma de dar de baja un alumno por la API; GR-06 muestra que un desvinculado llega con `eliminadoestado: 0` |
 | AL-V1 | Vista / rutas | `AlumnosView` y `AlumnoView` son **maquetas**: 20 tarjetas "alumno N" y nombres escritos a mano. Ninguna pantalla navega a `AppRutas.alumnos`, así que no se pueden alcanzar | Es de la vista y no se llega a ellas |
-| AL-V2 | Rutas | `route_generator.dart:32` importa `views/alumnos/alumnosView.dart`, pero el archivo es `AlumnosView.dart`: no compila en un sistema que distingue mayúsculas. Es el mismo caso que CAT-11 | Confirmado leyendo el código; en Windows ninguna prueba puede ponerlo en rojo |
+| AL-V2 | Rutas | `route_generator.dart:32` importa `views/alumnos/alumnosView.dart`, pero el archivo es `AlumnosView.dart`: no compila en un sistema que distingue mayúsculas. Es el mismo caso que CAT-11 | Confirmado leyendo el código; en Windows ninguna prueba puede ponerlo en rojo. **Corregido** (2026-11-18, commit 5e7f5e8, CI-01): el import usa `views/alumnos/AlumnosView.dart`; lo vigila la CI en Linux |
 
 ### Escenarios implementados
 
