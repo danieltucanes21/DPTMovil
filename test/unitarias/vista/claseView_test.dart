@@ -240,4 +240,99 @@ void main() {
     expect(find.byType(Claseview), findsNothing);
     expect(find.text('Abrir clase'), findsOneWidget);
   });
+
+  //AS-10: con marcas sin guardar, Cancelar y atras preguntan antes de salir
+  group('Cambios sin guardar (AS-10):', () {
+    testWidgets('$capa - $tipo - Cancelar - sin cambios sale sin preguntar', (
+      tester,
+    ) async {
+      await montarEncima(tester);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cambios sin guardar'), findsNothing);
+      expect(find.byType(Claseview), findsNothing);
+    });
+
+    testWidgets('$capa - $tipo - Cancelar - con cambios advierte y seguir editando conserva las marcas', (
+      tester,
+    ) async {
+      await montarEncima(tester);
+      await tester.tap(find.byType(Checkbox).at(0));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Cambios sin guardar'), findsOneWidget);
+
+      await tester.tap(find.text('SEGUIR EDITANDO'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Claseview), findsOneWidget);
+      final marcas = tester
+          .widgetList<Checkbox>(find.byType(Checkbox))
+          .map((c) => c.value);
+      expect(marcas, [true, false, true]);
+      expect(conexion.llamadasRegistrar, 0);
+    });
+
+    testWidgets('$capa - $tipo - Cancelar - con cambios, salir sin guardar sale y no envia', (
+      tester,
+    ) async {
+      await montarEncima(tester);
+      await tester.tap(find.byType(Checkbox).at(0));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SALIR SIN GUARDAR'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Claseview), findsNothing);
+      expect(find.text('Abrir clase'), findsOneWidget);
+      expect(conexion.llamadasRegistrar, 0);
+    });
+
+    testWidgets('$capa - $tipo - Atras - con cambios advierte igual que Cancelar', (
+      tester,
+    ) async {
+      await montarEncima(tester);
+      await tester.tap(find.byType(Checkbox).at(0));
+      await tester.pumpAndSettle();
+
+      //boton atras del sistema
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cambios sin guardar'), findsOneWidget);
+      expect(find.byType(Claseview), findsOneWidget);
+    });
+
+    testWidgets('$capa - $tipo - Cancelar - tras un registro fallido advierte', (
+      tester,
+    ) async {
+      conexion.respuestaRegistrar = RespuestaModelo(
+        codigoHttp: 500,
+        error: ErrorModelo(
+          codigoHttp: 500,
+          mensaje: 'no se pudo guardar',
+          url: '/asistenciasClase',
+          metodo: 'POST',
+        ),
+      );
+      await montarEncima(tester);
+      await tester.tap(find.byType(Checkbox).at(0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cerrar'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cambios sin guardar'), findsOneWidget);
+    });
+  });
 }

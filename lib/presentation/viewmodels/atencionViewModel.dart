@@ -43,6 +43,30 @@ class Atencionviewmodel with ChangeNotifier, NotificacionSegura {
   //al registrar
   int? _idClase;
 
+  //marcas tal como estan en el backend: las que trajo la carga o las que se
+  //guardaron con exito despues. Contra ellas se comparan las de pantalla
+  List<bool> _marcasGuardadas = const [];
+
+  //hay marcas en pantalla distintas de las guardadas, tambien despues de un
+  //registro fallido (AS-09). Marcar y desmarcar el mismo alumno no cuenta como
+  //cambio. La vista lo usa para advertir al salir (AS-10)
+  bool get hayCambiosSinGuardar {
+    final lista = _atenciones;
+    if (lista == null) return false;
+    if (lista.length != _marcasGuardadas.length) return true;
+    for (var i = 0; i < lista.length; i++) {
+      if (lista[i].estaAtendido != _marcasGuardadas[i]) return true;
+    }
+    return false;
+  }
+
+  List<bool> _marcasActuales() => [
+    for (final atencion in _atenciones ?? const <Atencionentidad>[])
+      atencion.estaAtendido,
+  ];
+
+  void _fijarMarcasGuardadas() => _marcasGuardadas = _marcasActuales();
+
   Future<void> cargarAtenciones(Grupoentidad grupo, Claseentidad clase) async {
     if (clase.codigo == null) {
       _error = 'La clase no tiene codigo, no se pueden cargar sus atenciones';
@@ -73,6 +97,7 @@ class Atencionviewmodel with ChangeNotifier, NotificacionSegura {
       _error = e.toString();
       _atenciones = [];
     }
+    _fijarMarcasGuardadas();
     _cargando = false;
     notifyListeners();
   }
@@ -101,6 +126,9 @@ class Atencionviewmodel with ChangeNotifier, NotificacionSegura {
       return Fallo(0, 'No hay alumnos para registrar', origen: 'ViewModel');
     }
     _registrando = true;
+    //lo que viaja: si el usuario marca algo mientras el envio esta en camino,
+    //esa marca sigue sin guardar cuando llega el exito
+    final enviadas = _marcasActuales();
     notifyListeners();
     try {
       final respuesta = await _servicioAtencion.registrarAtenciones(
@@ -109,6 +137,7 @@ class Atencionviewmodel with ChangeNotifier, NotificacionSegura {
       );
       //cualquier 2xx es exito (AS-07)
       if (respuesta.codigoHttp >= 200 && respuesta.codigoHttp < 300) {
+        _marcasGuardadas = enviadas;
         return Exito();
       }
       return _fallo(respuesta);

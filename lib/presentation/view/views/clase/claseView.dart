@@ -28,14 +28,52 @@ class Claseview extends StatefulWidget {
 class _ClaseviewState extends State<Claseview> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: Bar(
-        title:
-            '${widget.grupo.curso} ${widget.grupo.anio}.${widget.grupo.iterable}',
-      ),
-      drawer: Builder(builder: (context) => Menulateral()),
-      body: contenedorSeguro(context),
+    //con marcas sin guardar, atras y Cancelar preguntan antes de salir (AS-10).
+    //El pop tras un registro exitoso no pasa por aqui: Navigator.pop no
+    //consulta el PopScope
+    final hayCambios = context.select<Atencionviewmodel, bool>(
+      (vm) => vm.hayCambiosSinGuardar,
     );
+    return PopScope(
+      canPop: !hayCambios,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final navegador = Navigator.of(context);
+        if (await _confirmarSalida() && mounted) navegador.pop();
+      },
+      child: Scaffold(
+        appBar: Bar(
+          title:
+              '${widget.grupo.curso} ${widget.grupo.anio}.${widget.grupo.iterable}',
+        ),
+        drawer: Builder(builder: (context) => Menulateral()),
+        body: contenedorSeguro(context),
+      ),
+    );
+  }
+
+  Future<bool> _confirmarSalida() async {
+    final salir = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogo) => AlertDialog(
+            title: const Text('Cambios sin guardar'),
+            content: const Text(
+              'Hay marcas de asistencia sin guardar. Si sales ahora, se perderán.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogo, false),
+                child: const Text('SEGUIR EDITANDO'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogo, true),
+                child: const Text('SALIR SIN GUARDAR'),
+              ),
+            ],
+          ),
+    );
+    return salir ?? false;
   }
 
   Widget contenedorSeguro(BuildContext context) {
@@ -103,9 +141,8 @@ class _ClaseviewState extends State<Claseview> {
             },
           ),
           FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            //maybePop pasa por el PopScope: con cambios, pregunta (AS-10)
+            onPressed: () => Navigator.maybePop(context),
             child: Text('Cancelar'),
             style: FilledButton.styleFrom(
               backgroundColor: ColorTheme.secondary,

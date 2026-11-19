@@ -188,6 +188,74 @@ void main() {
       );
     });
   });
+
+  //AS-09 y AS-10: la vista advierte al salir si hay marcas sin guardar
+  group('Atenciones (cambios sin guardar):', () {
+    test('$capa - $tipo - Cambios sin guardar - recien cargada no hay cambios', () async {
+      await vm.cargarAtenciones(grupo, clase);
+
+      expect(vm.hayCambiosSinGuardar, isFalse);
+    });
+
+    test('$capa - $tipo - Cambios sin guardar - marcar un alumno es un cambio', () async {
+      await vm.cargarAtenciones(grupo, clase);
+
+      vm.marcarAsistencia(0, true);
+
+      expect(vm.hayCambiosSinGuardar, isTrue);
+    });
+
+    test('$capa - $tipo - Cambios sin guardar - marcar y desmarcar vuelve a lo guardado', () async {
+      await vm.cargarAtenciones(grupo, clase);
+
+      vm.marcarAsistencia(0, true);
+      vm.marcarAsistencia(0, false);
+
+      expect(vm.hayCambiosSinGuardar, isFalse);
+    });
+
+    test('$capa - $tipo - Registrar atenciones - tras un fallo se sabe que hay cambios sin guardar', () async {
+      conexion.respuestaRegistrar = error(500, 'POST');
+      await vm.cargarAtenciones(grupo, clase);
+      vm.marcarAsistencia(0, true);
+
+      final resultado = await vm.registrarAtenciones();
+
+      //la marca se ve en pantalla pero no esta guardada (AS-09)
+      expect(resultado, isA<Fallo>());
+      expect(vm.hayCambiosSinGuardar, isTrue);
+    });
+
+    test('$capa - $tipo - Registrar atenciones - tras un exito no quedan cambios', () async {
+      await vm.cargarAtenciones(grupo, clase);
+      vm.marcarAsistencia(0, true);
+
+      final resultado = await vm.registrarAtenciones();
+
+      expect(resultado, isA<Exito>());
+      expect(vm.hayCambiosSinGuardar, isFalse);
+    });
+
+    test('$capa - $tipo - Registrar atenciones - lo marcado durante el envio sigue sin guardar', () async {
+      await vm.cargarAtenciones(grupo, clase);
+      vm.marcarAsistencia(0, true);
+
+      final envio = vm.registrarAtenciones();
+      //el usuario marca a Luis mientras la respuesta va en camino
+      vm.marcarAsistencia(1, true);
+      await envio;
+
+      expect(vm.hayCambiosSinGuardar, isTrue);
+    });
+
+    test('$capa - $tipo - Cambios sin guardar - una carga fallida no tiene cambios', () async {
+      conexion.respuestaAtenciones = error(500, 'GET');
+
+      await vm.cargarAtenciones(grupo, clase);
+
+      expect(vm.hayCambiosSinGuardar, isFalse);
+    });
+  });
 }
 
 //respuesta de error como la arman las conexiones: el vm lee mensaje, metodo
