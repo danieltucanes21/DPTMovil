@@ -129,6 +129,13 @@ Respuestas del cliente, comunicadas por el equipo, a las preguntas de [entregabl
 | IN-05 | — | Las fechas de inscripción van **por grupo**, como ya las guarda el backend | IN-05 queda **cerrado**: no hacen falta fechas en el curso |
 | CAT-16a, CAT-16b | — | **Por confirmar con el cliente el 2026-11-19.** Contexto: las categorías son siempre las mismas tres (Recreativo, Semillero y Seleccionado) año tras año, y eliminar una es un borrado lógico (la fila queda en la base de datos, pero su información ya no es accesible) | Nada todavía. Depende en parte de lo que decida el desarrollo |
 
+**Rediseño de la toma de asistencia** (pedido del cliente, 2026-11-19, con un prototipo): la pantalla de la clase muestra los datos de la clase, un resumen (presentes, ausentes, justificadas), la lista de estudiantes con tres estados por alumno (**Presente**, **Ausente**, **Justificada**) y «Enviar reporte de asistencia». Hecho en la app el mismo día (`claseView.dart`, `domain/entities/estadoAsistencia.dart`). Decisiones del equipo:
+- **Justificada** se ve pero está deshabilitada: el backend solo guarda `PRESENTE`/`AUSENTE` y las faltas acumuladas cuentan `AUSENTE`, así que enviarla como ausente contaría como falta. Propuesta para el backend: [entregables/propuesta-asistencia-justificada-backend.md](entregables/propuesta-asistencia-justificada-backend.md).
+- Un alumno **sin marca** en el backend (la clase aún no se confirmó, o se inscribió después) empieza **Presente**: el instructor solo marca las excepciones. Ese valor por defecto no cuenta como cambio sin guardar (AS-10). La conexión distingue «sin marca» de «ausente» (`Atencionmodelo.marcada`).
+- Arriba, el encabezado de la pantalla («Tomar asistencia», con la línea roja) y una tarjeta con curso, grupo, día y hora del horario (`ClaseGrupoargumentos.horario`). La línea roja queda solo en los títulos principales: «Lista de estudiantes» ya no la lleva. No se agregó el botón de atrás del prototipo: ya está en la barra común.
+- Búsqueda de estudiantes por nombre o código (sin importar mayúsculas ni tildes); solo filtra lo que se ve, el resumen y el envío usan la lista completa.
+- «Cancelar» volvió, debajo de «Enviar reporte de asistencia» (pedido del 2026-11-19, después del prototipo). Igual que el botón atrás, avisa si hay cambios sin guardar.
+
 **Decisiones de diseño de AS-13** (del equipo, 2026-11-19; no son reglas del cliente):
 
 | Tema | Decisión |

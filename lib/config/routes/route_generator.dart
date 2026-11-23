@@ -207,6 +207,7 @@ Route<dynamic> _construirRuta(RouteSettings settings) {
                 grupo: datos.grupo,
                 clase: datos.clase,
                 soloLectura: datos.soloLectura,
+                horario: datos.horario,
               ),
             ),
       );

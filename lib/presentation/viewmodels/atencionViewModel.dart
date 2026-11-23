@@ -1,6 +1,7 @@
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 import 'package:dpt_movil/domain/entities/atencionEntidad.dart';
 import 'package:dpt_movil/domain/entities/claseEntidad.dart';
+import 'package:dpt_movil/domain/entities/estadoAsistencia.dart';
 import 'package:dpt_movil/domain/entities/grupoEntidad.dart';
 import 'package:dpt_movil/domain/entities/resultado.dart';
 import 'package:dpt_movil/domain/servicios/servicioAtencion.dart';
@@ -45,7 +46,7 @@ class Atencionviewmodel with ChangeNotifier, NotificacionSegura {
 
   //marcas tal como estan en el backend: las que trajo la carga o las que se
   //guardaron con exito despues. Contra ellas se comparan las de pantalla
-  List<bool> _marcasGuardadas = const [];
+  List<EstadoAsistencia> _marcasGuardadas = const [];
 
   //hay marcas en pantalla distintas de las guardadas, tambien despues de un
   //registro fallido (AS-09). Marcar y desmarcar el mismo alumno no cuenta como
@@ -55,15 +56,63 @@ class Atencionviewmodel with ChangeNotifier, NotificacionSegura {
     if (lista == null) return false;
     if (lista.length != _marcasGuardadas.length) return true;
     for (var i = 0; i < lista.length; i++) {
-      if (lista[i].estaAtendido != _marcasGuardadas[i]) return true;
+      if (lista[i].estado != _marcasGuardadas[i]) return true;
     }
     return false;
   }
 
-  List<bool> _marcasActuales() => [
+  List<EstadoAsistencia> _marcasActuales() => [
     for (final atencion in _atenciones ?? const <Atencionentidad>[])
-      atencion.estaAtendido,
+      atencion.estado,
   ];
+
+  //busqueda de estudiantes (2026-11-19): por nombre o codigo, sin importar
+  //mayusculas ni tildes. Solo filtra lo que se pinta: el resumen y el envio
+  //siguen usando la lista completa
+  String _filtro = '';
+  String get filtro => _filtro;
+
+  void filtrar(String texto) {
+    if (texto == _filtro) return;
+    _filtro = texto;
+    notifyListeners();
+  }
+
+  //posiciones en la lista completa de los alumnos que coinciden con el
+  //filtro: la vista marca con esa posicion (marcarEstado)
+  List<int> get indicesVisibles {
+    final lista = _atenciones ?? const <Atencionentidad>[];
+    final buscado = _normalizar(_filtro);
+    return [
+      for (var i = 0; i < lista.length; i++)
+        if (buscado.isEmpty ||
+            _normalizar(lista[i].alumno.nombre).contains(buscado) ||
+            (lista[i].alumno.codigo ?? '').contains(buscado))
+          i,
+    ];
+  }
+
+  static String _normalizar(String texto) {
+    const sinTilde = {
+      'á': 'a',
+      'é': 'e',
+      'í': 'i',
+      'ó': 'o',
+      'ú': 'u',
+      'ü': 'u',
+      'ñ': 'n',
+    };
+    return texto
+        .trim()
+        .toLowerCase()
+        .split('')
+        .map((c) => sinTilde[c] ?? c)
+        .join();
+  }
+
+  //contadores del resumen de la pantalla
+  int contar(EstadoAsistencia estado) =>
+      _atenciones?.where((a) => a.estado == estado).length ?? 0;
 
   void _fijarMarcasGuardadas() => _marcasGuardadas = _marcasActuales();
 
@@ -88,6 +137,12 @@ class Atencionviewmodel with ChangeNotifier, NotificacionSegura {
       //un grupo sin alumnos llega como 200 []; una clase inexistente, 404
       if (respuesta.codigoHttp == 200 && respuesta.datos is List) {
         _atenciones = (respuesta.datos as List).cast<Atencionentidad>();
+        //un alumno sin marca en el backend empieza presente: el instructor
+        //solo marca las excepciones (rediseño del 2026-11-19). No cuenta
+        //como cambio sin guardar
+        for (final atencion in _atenciones!) {
+          if (!atencion.marcada) atencion.estado = EstadoAsistencia.presente;
+        }
       } else {
         _error =
             'Código: ${respuesta.codigoHttp} - ${respuesta.error?.mensaje ?? "Error desconocido"}';
@@ -102,19 +157,34 @@ class Atencionviewmodel with ChangeNotifier, NotificacionSegura {
     notifyListeners();
   }
 
-  //la vista solo informa el cambio del checkbox; la entidad la modifica el vm
-  void marcarAsistencia(int indice, bool valor) {
+  //la vista solo informa el estado elegido; la entidad la modifica el vm.
+  //Justificada se ignora mientras el backend no la soporte
+  void marcarEstado(int indice, EstadoAsistencia estado) {
     final lista = _atenciones;
     if (lista == null || indice < 0 || indice >= lista.length) return;
-    lista[indice].estaAtendido = valor;
+    if (estado == EstadoAsistencia.justificada &&
+        !EstadoAsistencia.justificadaDisponible) {
+      return;
+    }
+    lista[indice].estado = estado;
     notifyListeners();
   }
+
+  //presente (true) o ausente (false)
+  void marcarAsistencia(int indice, bool valor) => marcarEstado(
+    indice,
+    valor ? EstadoAsistencia.presente : EstadoAsistencia.ausente,
+  );
 
   //registra las atenciones cargadas con su estado actual
   Future<Resultado<void>> registrarAtenciones() async {
     final lista = _atenciones;
     if (_registrando) {
-      return Fallo(0, 'Ya se esta registrando la asistencia', origen: 'ViewModel');
+      return Fallo(
+        0,
+        'Ya se esta registrando la asistencia',
+        origen: 'ViewModel',
+      );
     }
     if (_error != null) {
       return Fallo(0, _error!, origen: 'ViewModel');

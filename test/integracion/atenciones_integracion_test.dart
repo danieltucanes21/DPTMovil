@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
+import 'package:dpt_movil/domain/entities/estadoAsistencia.dart';
 import 'package:dpt_movil/presentation/view/views/clase/claseView.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'montajeAtenciones.dart';
+import 'pantallaAsistencia.dart';
 
 //integracion local de la toma de asistencia (fase 5 del diagnostico): rutas
 //reales y cadena real de atenciones sobre el transporte falso, sin backend.
@@ -19,11 +20,6 @@ void main() {
     app = MontajeAtenciones();
   });
 
-  List<bool?> marcas(WidgetTester tester) =>
-      tester
-          .widgetList<Checkbox>(find.byType(Checkbox))
-          .map((c) => c.value)
-          .toList();
 
   testWidgets('$capa - $tipo - Toma de asistencia - el instructor del grupo registra de punta a punta', (
     tester,
@@ -34,16 +30,15 @@ void main() {
     expect(find.byType(Claseview), findsOneWidget);
     final pedida = app.adaptador.peticionesA('GET', '/atencionesporclase').single;
     expect(pedida.uri.queryParameters, {'claseid': '210'});
-    expect(marcas(tester), [false, false, true]);
+    expect(estadosElegidos(tester), [EstadoAsistencia.ausente, EstadoAsistencia.ausente, EstadoAsistencia.presente]);
 
-    //marca a Ana y a Luis y desmarca a Marta
-    for (final indice in [0, 1, 2]) {
-      await tester.tap(find.byType(Checkbox).at(indice));
-      await tester.pumpAndSettle();
-    }
-    expect(marcas(tester), [true, true, false]);
+    //marca presentes a Ana y a Luis y ausente a Marta
+    await marcar(tester, EstadoAsistencia.presente, 0);
+    await marcar(tester, EstadoAsistencia.presente, 1);
+    await marcar(tester, EstadoAsistencia.ausente, 2);
+    expect(estadosElegidos(tester), [EstadoAsistencia.presente, EstadoAsistencia.presente, EstadoAsistencia.ausente]);
 
-    await tester.tap(find.text('Guardar'));
+    await tester.tap(botonEnviar());
     await tester.pumpAndSettle();
 
     //una sola peticion de cada tipo, en orden: cargar y despues registrar
@@ -78,10 +73,9 @@ void main() {
       DioExceptionType.connectionError,
     );
     await app.abrirClase(tester);
-    await tester.tap(find.byType(Checkbox).at(0));
-    await tester.pumpAndSettle();
+    await marcar(tester, EstadoAsistencia.presente, 0);
 
-    await tester.tap(find.text('Guardar'));
+    await tester.tap(botonEnviar());
     await tester.pumpAndSettle();
 
     expect(find.text('Error al registrar atenciones'), findsOneWidget);
@@ -91,7 +85,7 @@ void main() {
 
     //sigue en la clase con lo que marco, para reintentar
     expect(find.byType(Claseview), findsOneWidget);
-    expect(marcas(tester), [true, false, true]);
+    expect(estadosElegidos(tester), [EstadoAsistencia.presente, EstadoAsistencia.ausente, EstadoAsistencia.presente]);
   });
 
   testWidgets('$capa - $tipo - Toma de asistencia - error del backend al cargar se ve en la clase', (
@@ -108,6 +102,6 @@ void main() {
 
     expect(find.byType(Claseview), findsOneWidget);
     expect(find.textContaining('Código: 404'), findsOneWidget);
-    expect(find.byType(Checkbox), findsNothing);
+    expect(find.byType(BotonEstadoAsistencia), findsNothing);
   });
 }

@@ -2,6 +2,7 @@ import 'package:dpt_movil/data/models/errorModelo.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 import 'package:dpt_movil/data/repositories/atencionesRepositorio.dart';
 import 'package:dpt_movil/domain/entities/claseEntidad.dart';
+import 'package:dpt_movil/domain/entities/estadoAsistencia.dart';
 import 'package:dpt_movil/domain/entities/grupoEntidad.dart';
 import 'package:dpt_movil/domain/entities/resultado.dart';
 import 'package:dpt_movil/domain/servicios/servicioAtencion.dart';
@@ -185,6 +186,105 @@ void main() {
       expect(
         conexion.ultimasRegistradas!.map((a) => a.estaAtendido),
         [true, false, false],
+      );
+    });
+  });
+
+  //rediseno del 2026-11-19: tres estados, presente por defecto y resumen
+  group('Atenciones (estados):', () {
+    test('$capa - $tipo - Cargar atenciones - sin marca en el backend empiezan presentes', () async {
+      final sinMarcas = atencionesDelContrato('listar_200');
+      for (final a in sinMarcas) {
+        a.marcada = false;
+      }
+      conexion.respuestaAtenciones = RespuestaModelo(
+        codigoHttp: 200,
+        datos: sinMarcas,
+      );
+
+      await vm.cargarAtenciones(grupo, clase);
+
+      expect(vm.atenciones!.map((a) => a.estado), [
+        EstadoAsistencia.presente,
+        EstadoAsistencia.presente,
+        EstadoAsistencia.presente,
+      ]);
+      //el valor por defecto no es un cambio del usuario
+      expect(vm.hayCambiosSinGuardar, isFalse);
+    });
+
+    test('$capa - $tipo - Cargar atenciones - con marca se respeta lo guardado', () async {
+      await vm.cargarAtenciones(grupo, clase);
+
+      expect(vm.atenciones!.map((a) => a.estado), [
+        EstadoAsistencia.ausente,
+        EstadoAsistencia.ausente,
+        EstadoAsistencia.presente,
+      ]);
+    });
+
+    test('$capa - $tipo - Resumen - cuenta cada estado', () async {
+      await vm.cargarAtenciones(grupo, clase);
+
+      vm.marcarEstado(0, EstadoAsistencia.presente);
+
+      expect(vm.contar(EstadoAsistencia.presente), 2);
+      expect(vm.contar(EstadoAsistencia.ausente), 1);
+      expect(vm.contar(EstadoAsistencia.justificada), 0);
+    });
+
+    test('$capa - $tipo - Marcar estado - justificada no se acepta sin soporte del backend', () async {
+      await vm.cargarAtenciones(grupo, clase);
+      var notificaciones = 0;
+      vm.addListener(() => notificaciones++);
+
+      vm.marcarEstado(0, EstadoAsistencia.justificada);
+
+      expect(EstadoAsistencia.justificadaDisponible, isFalse);
+      expect(vm.atenciones![0].estado, EstadoAsistencia.ausente);
+      expect(notificaciones, 0);
+    });
+  });
+
+  //busqueda de estudiantes (2026-11-19)
+  group('Atenciones (busqueda):', () {
+    test('$capa - $tipo - Filtrar - por nombre sin importar mayusculas ni tildes', () async {
+      await vm.cargarAtenciones(grupo, clase);
+
+      vm.filtrar('  PÉREZ ');
+
+      expect(vm.indicesVisibles, [1]);
+    });
+
+    test('$capa - $tipo - Filtrar - por codigo', () async {
+      await vm.cargarAtenciones(grupo, clase);
+
+      vm.filtrar('011001');
+
+      expect(vm.indicesVisibles, [0]);
+    });
+
+    test('$capa - $tipo - Filtrar - vacio muestra a todos', () async {
+      await vm.cargarAtenciones(grupo, clase);
+      vm.filtrar('marta');
+
+      vm.filtrar('');
+
+      expect(vm.indicesVisibles, [0, 1, 2]);
+    });
+
+    test('$capa - $tipo - Filtrar - no cambia el resumen ni lo que se envia', () async {
+      await vm.cargarAtenciones(grupo, clase);
+      vm.filtrar('luis');
+
+      //se marca con la posicion en la lista completa
+      vm.marcarEstado(vm.indicesVisibles.single, EstadoAsistencia.presente);
+      await vm.registrarAtenciones();
+
+      expect(vm.contar(EstadoAsistencia.presente), 2);
+      expect(
+        conexion.ultimasRegistradas!.map((a) => a.estaAtendido),
+        [false, true, true],
       );
     });
   });

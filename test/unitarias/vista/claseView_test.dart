@@ -4,6 +4,7 @@ import 'package:dpt_movil/data/repositories/atencionesRepositorio.dart';
 import 'package:dpt_movil/data/repositories/autenticacionRepositorio.dart';
 import 'package:dpt_movil/domain/entities/claseEntidad.dart';
 import 'package:dpt_movil/domain/entities/grupoEntidad.dart';
+import 'package:dpt_movil/domain/entities/horarioEntidad.dart';
 import 'package:dpt_movil/domain/servicios/servicioAtencion.dart';
 import 'package:dpt_movil/domain/servicios/servicioAutenticacion.dart';
 import 'package:dpt_movil/presentation/view/views/clase/claseView.dart';
@@ -17,6 +18,9 @@ import '../../dobles/conexionatencionesFalsa.dart';
 import '../../dobles/conexionautenticacionFalsa.dart';
 import '../../dobles/googleSignInFalso.dart';
 import 'package:dpt_movil/data/api/sesion/almacenToken.dart';
+import 'package:dpt_movil/domain/entities/estadoAsistencia.dart';
+
+import '../../integracion/pantallaAsistencia.dart';
 
 //widget test de la pantalla de una clase (fase 5): el backend aun no tiene
 //los endpoints de atenciones, asi que esta es la unica forma de ver la
@@ -91,11 +95,8 @@ void main() {
     expect(find.text('Ana Gomez'), findsOneWidget);
     expect(find.text('Luis Perez'), findsOneWidget);
     expect(find.text('Marta Ruiz'), findsOneWidget);
-    //cada checkbox refleja lo que trajo la carga
-    final marcas = tester
-        .widgetList<Checkbox>(find.byType(Checkbox))
-        .map((c) => c.value);
-    expect(marcas, [false, false, true]);
+    //el estado elegido de cada alumno refleja lo que trajo la carga
+    expect(estadosElegidos(tester), [EstadoAsistencia.ausente, EstadoAsistencia.ausente, EstadoAsistencia.presente]);
   });
 
   testWidgets('$capa - $tipo - Clase - marcar y guardar envia la asistencia', (
@@ -103,11 +104,9 @@ void main() {
   ) async {
     await montar(tester);
 
-    //se marca a Luis (segundo checkbox); Ana queda sin marcar y Marta ya venia
-    //marcada
-    await tester.tap(find.byType(Checkbox).at(1));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Guardar'));
+    //se marca presente a Luis; Ana queda ausente y Marta ya venia presente
+    await marcar(tester, EstadoAsistencia.presente, 1);
+    await tester.tap(botonEnviar());
     await tester.pumpAndSettle();
 
     expect(conexion.llamadasRegistrar, 1);
@@ -179,7 +178,7 @@ void main() {
     await montar(tester);
 
     expect(find.text('Código: 500 - fallo interno'), findsOneWidget);
-    expect(find.byType(Checkbox), findsNothing);
+    expect(find.byType(BotonEstadoAsistencia), findsNothing);
   });
 
   testWidgets('$capa - $tipo - Clase - clase sin alumnos lo dice', (
@@ -193,7 +192,7 @@ void main() {
     await montar(tester);
 
     expect(find.text('¡No hay alumnos aún!'), findsOneWidget);
-    expect(find.byType(Checkbox), findsNothing);
+    expect(find.byType(BotonEstadoAsistencia), findsNothing);
   });
 
   testWidgets('$capa - $tipo - Clase - registro fallido muestra el error y no sale', (
@@ -210,7 +209,7 @@ void main() {
     );
     await montarEncima(tester);
 
-    await tester.tap(find.text('Guardar'));
+    await tester.tap(botonEnviar());
     await tester.pumpAndSettle();
 
     expect(find.text('Error al registrar atenciones'), findsOneWidget);
@@ -220,7 +219,7 @@ void main() {
     await tester.pumpAndSettle();
     //el usuario sigue en la clase con sus marcas para reintentar
     expect(find.byType(Claseview), findsOneWidget);
-    expect(find.byType(Checkbox), findsNWidgets(3));
+    expect(estadosElegidos(tester), hasLength(3));
   });
 
   testWidgets('$capa - $tipo - Clase - registro exitoso avisa y vuelve atras', (
@@ -228,7 +227,7 @@ void main() {
   ) async {
     await montarEncima(tester);
 
-    await tester.tap(find.text('Guardar'));
+    await tester.tap(botonEnviar());
     await tester.pumpAndSettle();
     expect(find.text('Atenciones registradas'), findsOneWidget);
     //mientras el dialogo esta abierto la pantalla no se ha cerrado
@@ -239,6 +238,169 @@ void main() {
 
     expect(find.byType(Claseview), findsNothing);
     expect(find.text('Abrir clase'), findsOneWidget);
+  });
+
+  //rediseno del 2026-11-19
+  testWidgets('$capa - $tipo - Clase - el resumen cuenta presentes, ausentes y justificadas', (
+    tester,
+  ) async {
+    await montar(tester);
+
+    String contador(String clave) =>
+        tester.widget<Text>(find.byKey(ValueKey(clave))).data!;
+    expect(contador('resumen-presentes'), '1');
+    expect(contador('resumen-ausentes'), '2');
+    expect(contador('resumen-justificadas'), '0');
+
+    await marcar(tester, EstadoAsistencia.presente, 0);
+
+    expect(contador('resumen-presentes'), '2');
+    expect(contador('resumen-ausentes'), '1');
+  });
+
+  testWidgets('$capa - $tipo - Clase - justificada se ve pero no se puede elegir', (
+    tester,
+  ) async {
+    await montar(tester);
+
+    final justificadas = tester.widgetList<BotonEstadoAsistencia>(
+      find.byWidgetPredicate(
+        (w) =>
+            w is BotonEstadoAsistencia &&
+            w.estado == EstadoAsistencia.justificada,
+      ),
+    );
+    expect(justificadas, hasLength(3));
+    expect(justificadas.every((b) => !b.habilitado), isTrue);
+  });
+
+  testWidgets('$capa - $tipo - Clase - sin marcas guardadas todos empiezan presentes', (
+    tester,
+  ) async {
+    final sinMarcas = atencionesDelContrato('listar_200');
+    for (final a in sinMarcas) {
+      a.marcada = false;
+    }
+    conexion.respuestaAtenciones = RespuestaModelo(
+      codigoHttp: 200,
+      datos: sinMarcas,
+    );
+
+    await montar(tester);
+
+    expect(estadosElegidos(tester), [
+      EstadoAsistencia.presente,
+      EstadoAsistencia.presente,
+      EstadoAsistencia.presente,
+    ]);
+    //iniciales y codigo del alumno, como en el prototipo
+    expect(find.text('AG'), findsOneWidget);
+    expect(find.text('Código 104619011001'), findsOneWidget);
+  });
+
+  testWidgets('$capa - $tipo - Clase - encabezado y tarjeta con el dia y la hora del horario', (
+    tester,
+  ) async {
+    final pasada = Claseentidad(
+      codigo: 210,
+      idGrupoCategoria: 'Deportes',
+      idGrupoCurso: 'Iniciacion',
+      idGrupoAnio: 2026,
+      idGrupoIterable: 1,
+      idInstructor: 'ins1',
+      fecha: DateTime(2026, 11, 14),
+      eliminado: 0,
+    );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create:
+                (_) => AutenticacionViewModel(
+                  Servicioautenticacion(
+                    Autenticacionrepositorio(
+                      conexion: ConexionautenticacionFalsa(), almacenToken: AlmacenToken(),
+                    ),
+                  ),
+                  GoogleSignInFalso(),
+                ),
+          ),
+          ChangeNotifierProvider(
+            create:
+                (_) => Atencionviewmodel(
+                  Servicioatencion(Atencionesrepositorio(conexion: conexion)),
+                )..cargarAtenciones(grupo, pasada),
+          ),
+        ],
+        child: MaterialApp(
+          home: Claseview(
+            grupo: grupo,
+            clase: pasada,
+            horario: Horarioentidad(
+              categoria: 'Deportes',
+              curso: 'Iniciacion',
+              anio: 2026,
+              iterable: 1,
+              dia: 'SABADO',
+              horaInicio: '09:00:00',
+              horaFin: '11:00:00',
+              escenario: 'Coliseo',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tomar asistencia'), findsOneWidget);
+    expect(find.text('Iniciacion · Grupo 2026.1'), findsOneWidget);
+    expect(find.text('Sábados · 9:00 a. m.'), findsOneWidget);
+  });
+
+  testWidgets('$capa - $tipo - Clase - la busqueda filtra la lista y marca al alumno correcto', (
+    tester,
+  ) async {
+    await montar(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('busqueda-estudiantes')),
+      'luis',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Luis Perez'), findsOneWidget);
+    expect(find.text('Ana Gomez'), findsNothing);
+    expect(find.text('Marta Ruiz'), findsNothing);
+
+    //el unico alumno visible es Luis, que en la lista completa es el segundo
+    await marcar(tester, EstadoAsistencia.presente, 0);
+    expect(estadosElegidos(tester), [EstadoAsistencia.presente]);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('busqueda-estudiantes')),
+      '',
+    );
+    await tester.pumpAndSettle();
+    expect(estadosElegidos(tester), [
+      EstadoAsistencia.ausente,
+      EstadoAsistencia.presente,
+      EstadoAsistencia.presente,
+    ]);
+  });
+
+  testWidgets('$capa - $tipo - Clase - una busqueda sin resultados lo dice', (
+    tester,
+  ) async {
+    await montar(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('busqueda-estudiantes')),
+      'zzz',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BotonEstadoAsistencia), findsNothing);
+    expect(find.text('Ningún estudiante coincide con «zzz»'), findsOneWidget);
   });
 
   //AS-13: fuera de la ventana de asistencia la clase solo se consulta
@@ -273,10 +435,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final checkboxes = tester.widgetList<Checkbox>(find.byType(Checkbox));
-    expect(checkboxes.map((c) => c.value), [false, false, true]);
-    expect(checkboxes.every((c) => c.onChanged == null), isTrue);
-    expect(find.text('Guardar'), findsNothing);
+    expect(estadosElegidos(tester), [EstadoAsistencia.ausente, EstadoAsistencia.ausente, EstadoAsistencia.presente]);
+    final botones = tester.widgetList<BotonEstadoAsistencia>(
+      find.byType(BotonEstadoAsistencia),
+    );
+    expect(botones.every((b) => !b.habilitado), isTrue);
+    expect(botonEnviar(), findsNothing);
     expect(find.text('Volver'), findsOneWidget);
     expect(
       find.text('Solo lectura: el plazo para tomar asistencia de esta clase terminó'),
@@ -284,8 +448,9 @@ void main() {
     );
   });
 
-  //AS-10: con marcas sin guardar, Cancelar y atras preguntan antes de salir
-  group('Cambios sin guardar (AS-10):', () {
+  //AS-10: con marcas sin guardar, Cancelar y atras (barra o sistema) preguntan
+  //antes de salir
+  group('Cancelar:', () {
     testWidgets('$capa - $tipo - Cancelar - sin cambios sale sin preguntar', (
       tester,
     ) async {
@@ -298,14 +463,42 @@ void main() {
       expect(find.byType(Claseview), findsNothing);
     });
 
-    testWidgets('$capa - $tipo - Cancelar - con cambios advierte y seguir editando conserva las marcas', (
+    testWidgets('$capa - $tipo - Cancelar - con cambios advierte como atras', (
       tester,
     ) async {
       await montarEncima(tester);
-      await tester.tap(find.byType(Checkbox).at(0));
+      await marcar(tester, EstadoAsistencia.presente, 0);
+
+      await tester.ensureVisible(find.text('Cancelar'));
+      await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Cancelar'));
+      expect(find.text('Cambios sin guardar'), findsOneWidget);
+      expect(find.byType(Claseview), findsOneWidget);
+    });
+  });
+
+  //AS-10: con marcas sin guardar, atras (barra o sistema) pregunta antes de salir
+  group('Cambios sin guardar (AS-10):', () {
+    testWidgets('$capa - $tipo - Atras - sin cambios sale sin preguntar', (
+      tester,
+    ) async {
+      await montarEncima(tester);
+
+      await tester.tap(botonAtras());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cambios sin guardar'), findsNothing);
+      expect(find.byType(Claseview), findsNothing);
+    });
+
+    testWidgets('$capa - $tipo - Atras - con cambios advierte y seguir editando conserva las marcas', (
+      tester,
+    ) async {
+      await montarEncima(tester);
+      await marcar(tester, EstadoAsistencia.presente, 0);
+
+      await tester.tap(botonAtras());
       await tester.pumpAndSettle();
       expect(find.text('Cambios sin guardar'), findsOneWidget);
 
@@ -313,21 +506,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(Claseview), findsOneWidget);
-      final marcas = tester
-          .widgetList<Checkbox>(find.byType(Checkbox))
-          .map((c) => c.value);
-      expect(marcas, [true, false, true]);
+      expect(estadosElegidos(tester), [EstadoAsistencia.presente, EstadoAsistencia.ausente, EstadoAsistencia.presente]);
       expect(conexion.llamadasRegistrar, 0);
     });
 
-    testWidgets('$capa - $tipo - Cancelar - con cambios, salir sin guardar sale y no envia', (
+    testWidgets('$capa - $tipo - Atras - con cambios, salir sin guardar sale y no envia', (
       tester,
     ) async {
       await montarEncima(tester);
-      await tester.tap(find.byType(Checkbox).at(0));
-      await tester.pumpAndSettle();
+      await marcar(tester, EstadoAsistencia.presente, 0);
 
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(botonAtras());
       await tester.pumpAndSettle();
       await tester.tap(find.text('SALIR SIN GUARDAR'));
       await tester.pumpAndSettle();
@@ -337,12 +526,11 @@ void main() {
       expect(conexion.llamadasRegistrar, 0);
     });
 
-    testWidgets('$capa - $tipo - Atras - con cambios advierte igual que Cancelar', (
+    testWidgets('$capa - $tipo - Atras del sistema - con cambios advierte igual que el de la barra', (
       tester,
     ) async {
       await montarEncima(tester);
-      await tester.tap(find.byType(Checkbox).at(0));
-      await tester.pumpAndSettle();
+      await marcar(tester, EstadoAsistencia.presente, 0);
 
       //boton atras del sistema
       await tester.binding.handlePopRoute();
@@ -352,7 +540,7 @@ void main() {
       expect(find.byType(Claseview), findsOneWidget);
     });
 
-    testWidgets('$capa - $tipo - Cancelar - tras un registro fallido advierte', (
+    testWidgets('$capa - $tipo - Atras - tras un registro fallido advierte', (
       tester,
     ) async {
       conexion.respuestaRegistrar = RespuestaModelo(
@@ -365,14 +553,13 @@ void main() {
         ),
       );
       await montarEncima(tester);
-      await tester.tap(find.byType(Checkbox).at(0));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Guardar'));
+      await marcar(tester, EstadoAsistencia.presente, 0);
+      await tester.tap(botonEnviar());
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cerrar'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(botonAtras());
       await tester.pumpAndSettle();
 
       expect(find.text('Cambios sin guardar'), findsOneWidget);

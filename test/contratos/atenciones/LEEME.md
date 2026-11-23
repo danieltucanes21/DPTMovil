@@ -14,6 +14,8 @@ Según la descripción del endpoint, el POST **sincroniza**: inserta las marcada
 ## Archivos
 
 - `listar_200.json`: tres alumnos de la clase 210, uno ya marcado. Incluye `codigo` e `imagen` del alumno.
+- `alumnosGrupo_200.json` y `atencionesporclase_200.json`: la forma del backend nuevo (BK-02). `atencionesporclase_200.json` trae una fila por alumno, como queda una clase ya confirmada (el backend marca `AUSENTE` al resto del grupo). Desde el rediseño del 2026-11-19, un alumno **sin fila** se muestra Presente; por eso el contrato no deja alumnos sin fila.
+- `atencionesporclase_vacia.json`: clase sin marcas (`GC-0002`).
 - `listar_vacia.json`: grupo sin alumnos.
 - `registrar_peticion.json`: lo que la app debe enviar después de cargar `listar_200.json` y marcar el alumno de índice 1 (Luis Perez).
 - `registrar_200.json`: resumen de cambios que responde el POST.

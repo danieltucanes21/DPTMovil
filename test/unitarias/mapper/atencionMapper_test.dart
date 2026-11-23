@@ -1,5 +1,6 @@
 import 'package:dpt_movil/data/mappers/atencionMapper.dart';
 import 'package:dpt_movil/data/models/atencionModelo.dart';
+import 'package:dpt_movil/domain/entities/estadoAsistencia.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../contratos/leerContrato.dart';
@@ -11,6 +12,17 @@ void main() {
   const String tipo = "unitaria";
 
   group('Asistencias (mapper):', () {
+    test('$capa - $tipo - aEntidad - sin marca en el backend llega sin marcar', () {
+      final json = {
+        ...(leerContrato('atenciones', 'listar_200') as List).first as Map,
+        'asistio': null,
+      };
+
+      final entidad = AtencionMapper.aEntidad(Atencionmodelo.fromJson(json, 7));
+
+      expect(entidad.marcada, isFalse);
+    });
+
     test('$capa - $tipo - aEntidad - convierte la asistencia y su alumno', () {
       final json = (leerContrato('atenciones', 'listar_200') as List).first;
 
@@ -18,6 +30,8 @@ void main() {
 
       expect(entidad.idClase, 7);
       expect(entidad.estaAtendido, isFalse);
+      expect(entidad.estado, EstadoAsistencia.ausente);
+      expect(entidad.marcada, isTrue);
       expect(entidad.alumno.id, '1061001');
       expect(entidad.alumno.nombre, 'Ana Gomez');
       expect(entidad.alumno.correo, 'anagomez@unicauca.edu.co');

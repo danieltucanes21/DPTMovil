@@ -20,6 +20,8 @@ import '../../dobles/conexionautenticacionFalsa.dart';
 import '../../dobles/googleSignInFalso.dart';
 import 'package:dpt_movil/data/api/sesion/almacenToken.dart';
 
+import '../../integracion/pantallaAsistencia.dart';
+
 //guardar la asistencia en la pantalla de la clase (AS-02, AS-03)
 void main() {
   const String capa = "vista";
@@ -89,10 +91,10 @@ void main() {
       conexion.antesDeRegistrar = () => pausa.future;
       await montarClase(tester);
 
-      await tester.tap(find.text('Guardar'));
+      await tester.tap(botonEnviar());
       await tester.pump();
       //el primer envio sigue en camino: el usuario no ve nada y vuelve a tocar
-      await tester.tap(find.text('Guardar'), warnIfMissed: false);
+      await tester.tap(botonEnviar(), warnIfMissed: false);
       await tester.pump();
       pausa.complete();
       await tester.pumpAndSettle();
@@ -114,11 +116,14 @@ void main() {
       );
       await montarClase(tester);
 
-      final guardar = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Guardar'),
+      final guardar = tester.widget<ButtonStyleButton>(
+        find.ancestor(
+          of: botonEnviar(),
+          matching: find.bySubtype<ButtonStyleButton>(),
+        ),
       );
       if (guardar.onPressed != null) {
-        await tester.tap(find.text('Guardar'));
+        await tester.tap(botonEnviar());
         await tester.pumpAndSettle();
         //la clase si puede tener alumnos: lo que fallo fue la carga
         expect(find.text('No hay alumnos para registrar'), findsNothing);

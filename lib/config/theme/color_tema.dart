@@ -44,6 +44,18 @@ class ColorTheme {
   static const Color four = Color(0xFF00AAE5);
   static const Color five = Color(0xFF5A00BA);
 
+  //toma de asistencia (rediseño del 2026-11-19): fondo y texto del estado
+  //elegido de cada alumno
+  static const Color asistenciaPresenteFondo = Color(0xFFDDF3DA);
+  static const Color asistenciaPresente = Color(0xFF2E7D32);
+  static const Color asistenciaAusenteFondo = Color(0xFFFBE3E4);
+  static const Color asistenciaAusente = Color(0xFF9D0311);
+  static const Color asistenciaJustificadaFondo = Color(0xFFFFF1D1);
+  static const Color asistenciaJustificada = Color(0xFF8A5A00);
+
+  ///borde de las tarjetas de la toma de asistencia
+  static const Color asistenciaBorde = Color(0xFFE3E5EE);
+
   //menu lateral: fondo primary y estos tonos del rediseño
   ///fondo del logo y texto de la opcion seleccionada del menu lateral
   static const Color menuAcento = Color(0xFF08086B);

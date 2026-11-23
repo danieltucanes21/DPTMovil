@@ -6,19 +6,23 @@ class Atencionmodelo {
   Alumnomodelo alumno;
   int idClase;
   bool estaAtendido;
+  //el backend tiene una fila de este alumno en la clase (/atencionesporclase)
+  bool marcada;
   Atencionmodelo({
     required this.alumno,
     required this.idClase,
     required this.estaAtendido,
+    this.marcada = true,
   });
 
   //lee la forma que arma la conexion al unir un alumno del grupo con su marca
-  //en la clase: {alumno, asistio}
+  //en la clase: {alumno, asistio}. asistio nulo: el alumno no tiene marca
   factory Atencionmodelo.fromJson(dynamic json, int idClase) {
     return Atencionmodelo(
       alumno: Alumnomodelo.fromJson(json['alumno']),
       idClase: idClase,
       estaAtendido: json['asistio'] == true,
+      marcada: json['asistio'] != null,
     );
   }
 
