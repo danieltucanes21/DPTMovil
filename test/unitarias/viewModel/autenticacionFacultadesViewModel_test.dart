@@ -42,33 +42,51 @@ void main() {
 
   test('$capa - $tipo - Login - 200 guarda el perfil y notifica', () async {
     final conexion = ConexionautenticacionFalsa()
-      ..respuestaLogin = RespuestaModelo(
+      ..respuestaToken = RespuestaModelo(
         codigoHttp: 200,
-        datos: Perfilmodelo(
-          id: '1',
-          nombre: 'Ana',
-          correo: 'ana@unicauca.edu.co',
-          tipoId: 'CC',
-          sexo: 'F',
-          role: 'Coordinador',
+        datos: Tokenmodelo(
+          token: 'jwt-del-sistema',
+          perfil: Perfilmodelo(
+            id: '1',
+            nombre: 'Ana',
+            correo: 'ana@unicauca.edu.co',
+            tipoId: 'CC',
+            sexo: 'F',
+            role: 'Coordinador',
+          ),
         ),
       );
     final vm = AutenticacionViewModel(
       Servicioautenticacion(Autenticacionrepositorio(conexion: conexion, almacenToken: AlmacenToken())),
-      GoogleSignInFalso(),
+      GoogleSignInFalso()..cuenta = CuentaGoogleFalsa(email: 'ana@unicauca.edu.co'),
     );
     int notificaciones = 0;
     vm.addListener(() => notificaciones++);
 
-    vm.prepararLoginConCorreo('ana@unicauca.edu.co');
+    await vm.loginGoogle();
     final respuesta = await vm.login();
 
     expect(respuesta.codigoHttp, 200);
-    expect(conexion.ultimoCorreo, 'ana@unicauca.edu.co');
     //el rol es lo que habilita las opciones de coordinador en la UI
     expect(vm.perfilSesion?.role, 'Coordinador');
     //sin la notificacion el menu lateral no se entera de la sesion
     expect(notificaciones, 1);
+  });
+
+  //BK-11: la entrada solo con correo (GET /login) se quito
+  test('$capa - $tipo - Login - sin cuenta de Google devuelve error y no llega a la red', () async {
+    final conexion = ConexionautenticacionFalsa();
+    final vm = AutenticacionViewModel(
+      Servicioautenticacion(Autenticacionrepositorio(conexion: conexion, almacenToken: AlmacenToken())),
+      GoogleSignInFalso(),
+    );
+
+    final respuesta = await vm.login();
+
+    expect(respuesta.error?.mensaje, contains('cuenta de Google'));
+    expect(conexion.llamadasLogin, 0);
+    expect(conexion.llamadasToken, 0);
+    expect(vm.perfilSesion, isNull);
   });
 
   group('Sesion con Google (vm con dobles):', () {

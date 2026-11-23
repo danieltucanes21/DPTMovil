@@ -54,7 +54,6 @@ import 'package:dpt_movil/presentation/viewmodels/deporteViewModel.dart';
 import 'package:dpt_movil/presentation/viewmodels/detalleGrupoViewModel.dart';
 import 'package:dpt_movil/domain/entities/grupoEntidad.dart';
 import 'package:dpt_movil/presentation/viewmodels/atencionViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/autenticacionViewModel.dart';
 import 'package:dpt_movil/presentation/viewmodels/facultadesViewModel.dart';
 import 'package:dpt_movil/presentation/viewmodels/gruposViewModel.dart';
 import 'package:dpt_movil/presentation/viewmodels/alumnosViewModel.dart';
@@ -66,14 +65,12 @@ import 'package:dpt_movil/presentation/viewmodels/periodoInscripcionViewModel.da
 import 'package:flutter_test/flutter_test.dart';
 
 import 'dobles/conexionCategoriaLocal.dart';
-import 'dobles/googleSignInFalso.dart';
 import 'local/viewModel/categoria/vmListarCategoriaLocalTest.dart';
 import 'remoto/viewModel/categoria/vmActualizarCategoriaTest.dart';
 import 'remoto/viewModel/clase/vmRegistrarClaseTest.dart';
 import 'remoto/viewModel/curso/vmCursoTest.dart';
 import 'remoto/viewModel/deporte/vmListarDeportesTest.dart';
 import 'remoto/viewModel/atencion/vmAtencionTest.dart';
-import 'remoto/viewModel/autenticacion/vmLoginTest.dart';
 import 'remoto/viewModel/facultades/vmListarFacultadesTest.dart';
 import 'remoto/viewModel/grupo/vmListarGruposTest.dart';
 import 'remoto/viewModel/grupo/vmModuloGrupoTest.dart';
@@ -115,7 +112,6 @@ void main() {
   probarViewModelAtencion();
   probarViewModelGrupo();
   probarViewModelFacultades();
-  probarViewModelAutenticacion();
   probarViewModelDeporte();
   probarViewModelCurso();
   probarViewModelModuloGrupo();
@@ -468,22 +464,6 @@ probarViewModelFacultades(){
   group('Listar facultades:', () {
     VmListarFacultadesTest test = VmListarFacultadesTest();
     test.prueba1codigo200(crearVm);
-  });
-}
-probarViewModelAutenticacion(){
-  //el login por correo no usa Google: basta el doble, sin plugin nativo
-  AutenticacionViewModel crearVm() => AutenticacionViewModel(
-    Servicioautenticacion(
-      Autenticacionrepositorio(
-        conexion: Conexionautenticacionremoto(crearDioPruebas(baseUrlPruebas)), almacenToken: AlmacenToken(),
-      ),
-    ),
-    GoogleSignInFalso(),
-  );
-  group('Login por correo:', () {
-    VmLoginTest test = VmLoginTest();
-    test.prueba1NoRegistrado404(crearVm);
-    test.prueba2SinCorreo(crearVm);
   });
 }
 probarViewModelGrupo(){
