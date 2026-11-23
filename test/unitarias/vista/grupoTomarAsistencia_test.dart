@@ -172,7 +172,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Finder botonTomar() => find.widgetWithText(OutlinedButton, 'TOMAR ASISTENCIA');
+  //FilledButton.icon es una subclase: se busca cualquier boton con ese texto
+  Finder botonTomar() => find.ancestor(
+    of: find.text('Tomar asistencia', skipOffstage: false),
+    matching: find.byWidgetPredicate(
+      (w) => w is ButtonStyleButton,
+      skipOffstage: false,
+    ),
+  );
 
   group('Pantalla del grupo (AS-13):', () {
     testWidgets('$capa - $tipo - Tomar asistencia - en la ventana registra la clase de hoy y la abre para marcar', (
@@ -194,6 +201,8 @@ void main() {
       expect(conexionClases.ultimaAgregada!.fecha, DateTime(2026, 11, 19));
       expect(clasesAbiertas.single.clase.codigo, 300);
       expect(clasesAbiertas.single.soloLectura, isFalse);
+      //el horario del dia viaja para mostrar dia y hora
+      expect(clasesAbiertas.single.horario?.horaInicio, '08:00');
     });
 
     testWidgets('$capa - $tipo - Tomar asistencia - antes de la hora esta deshabilitado y dice desde cuando', (
@@ -203,8 +212,8 @@ void main() {
       await montar(tester, Roles.instructor);
 
       await tester.ensureVisible(botonTomar());
-      expect(tester.widget<OutlinedButton>(botonTomar()).onPressed, isNull);
-      expect(find.text('Disponible hoy desde las 08:00'), findsOneWidget);
+      expect(tester.widget<ButtonStyleButton>(botonTomar()).onPressed, isNull);
+      expect(find.text('Disponible hoy desde las 08:00', skipOffstage: false), findsOneWidget);
     });
 
     testWidgets('$capa - $tipo - Tomar asistencia - un dia sin clase lo dice', (
@@ -214,9 +223,12 @@ void main() {
       await montar(tester, Roles.coordinador);
 
       await tester.ensureVisible(botonTomar());
-      expect(tester.widget<OutlinedButton>(botonTomar()).onPressed, isNull);
+      expect(tester.widget<ButtonStyleButton>(botonTomar()).onPressed, isNull);
       expect(
-        find.text('Hoy no hay clase según el horario del grupo'),
+        find.text(
+          'Hoy no hay clase según el horario del grupo',
+          skipOffstage: false,
+        ),
         findsOneWidget,
       );
     });
@@ -226,7 +238,7 @@ void main() {
     ) async {
       await montar(tester, Roles.instructor);
 
-      await tocar(tester, find.text('Fecha clase: 2026-11-12'));
+      await tocar(tester, find.text('Jueves, 12 de noviembre', skipOffstage: false));
 
       expect(clasesAbiertas.single.clase.codigo, 9);
       expect(clasesAbiertas.single.soloLectura, isTrue);
@@ -237,7 +249,7 @@ void main() {
     ) async {
       await montar(tester, Roles.coordinador);
 
-      await tocar(tester, find.text('Fecha clase: 2026-11-12'));
+      await tocar(tester, find.text('Jueves, 12 de noviembre', skipOffstage: false));
 
       expect(clasesAbiertas.single.soloLectura, isFalse);
     });

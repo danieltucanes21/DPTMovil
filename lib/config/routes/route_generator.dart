@@ -111,6 +111,7 @@ Route<dynamic> _construirRuta(RouteSettings settings) {
                     c.read(),
                     c.read(),
                     c.read(),
+                    servicioInstructor: c.read(),
                   )..cargar(),
               child: Grupo(grupo: datos),
             ),

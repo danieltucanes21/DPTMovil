@@ -1,3 +1,4 @@
+import 'package:dpt_movil/config/formatDate.dart';
 import 'package:dpt_movil/domain/entities/diaSemana.dart';
 import 'package:dpt_movil/config/theme/color_tema.dart';
 import 'package:dpt_movil/config/theme/tipografia.dart';
@@ -5,7 +6,7 @@ import 'package:dpt_movil/domain/entities/horarioEntidad.dart';
 import 'package:dpt_movil/domain/entities/resultado.dart';
 import 'package:dpt_movil/presentation/utils/Utilidades.dart';
 import 'package:dpt_movil/presentation/view/widgets/dialogError.dart';
-import 'package:dpt_movil/presentation/view/widgets/mini_tarjeta.dart';
+import 'package:dpt_movil/presentation/view/views/grupo/seccionGrupo.dart';
 import 'package:dpt_movil/presentation/viewmodels/detalleGrupoViewModel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -20,53 +21,45 @@ class Widgetlistahorarios extends StatelessWidget {
         .select<DetalleGrupoViewModel, EstadoSeccion<List<Horarioentidad>>>(
           (vm) => vm.horarios,
         );
-    if (seccion.cargando) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (seccion.error != null) {
-      return Text(
-        'no se logro obtener informacion: ${seccion.error}',
-        style: Tipografia.cuerpo1(color: ColorTheme.error),
-      );
-    }
-    return mostrarHorarios(context, seccion.datos);
-  }
-
-  Widget mostrarHorarios(BuildContext context, List<Horarioentidad> lista) {
-    return Container(
-      child: Column(
-        children: [
-          Text('Horarios', style: Tipografia.h6()),
-          OutlinedButton.icon(
-            onPressed: () => _agregar(context),
-            label: Text('AGREGAR HORARIO'),
-            icon: Icon(Icons.add),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        EncabezadoSeccion(
+          titulo: 'Horario',
+          subtitulo: seccion.cargando || seccion.error != null
+              ? null
+              : _sesiones(seccion.datos.length),
+          accion: BotonSeccion(
+            texto: 'Agregar horario',
+            icono: Icons.add,
+            alPresionar: () => _agregar(context),
           ),
-          (lista.isEmpty)
-              ? Text(
-                'No hay horarios aun!',
-                style: Tipografia.cuerpo1(color: ColorTheme.secondaryDark),
-              )
-              : ListView.builder(
-                shrinkWrap: true, // Ajusta el tamaño de la lista al contenido
-                physics:
-                    const NeverScrollableScrollPhysics(), // Desactiva scroll interno
-                itemCount: lista.length, // Cambia esto según tu lista
-                itemBuilder: (BuildContext context, int index) {
-                  Horarioentidad horario = lista[index];
-                  return MiniTarjeta(
-                    atrTitulo: '${DiaSemana.etiqueta(horario.dia)} - ${horario.escenario}',
-                    atrSubTitulo: '${horario.horaInicio} - ${horario.horaFin}',
-                    existeBotonCierre: true,
-                    alCerrar: () => _eliminar(context, horario),
-                    existeCampoImagen: false,
-                  );
-                },
-              ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 16),
+        if (seccion.cargando)
+          const Center(child: CircularProgressIndicator())
+        else if (seccion.error != null)
+          AvisoSeccion(
+            'No se pudo obtener el horario: ${seccion.error}',
+            esError: true,
+          )
+        else if (seccion.datos.isEmpty)
+          const AvisoSeccion('El grupo aún no tiene horario')
+        else
+          for (final horario in seccion.datos)
+            _TarjetaHorario(
+              horario,
+              alEliminar: () => _eliminar(context, horario),
+            ),
+      ],
     );
   }
+
+  static String _sesiones(int n) => switch (n) {
+    0 => 'Sin sesiones semanales',
+    1 => '1 sesión semanal',
+    _ => '$n sesiones semanales',
+  };
 
   //el formulario es un dialogo que devuelve los datos; el vm valida, envia y
   //recarga la seccion, y la vista solo muestra el error si lo hay
@@ -112,6 +105,72 @@ class Widgetlistahorarios extends StatelessWidget {
             (_) => DialogError(titulo: titulo, codigo: codigo, mensaje: mensaje),
       );
     }
+  }
+}
+
+//dia, horas y escenario de un horario; el boton de la derecha lo elimina
+class _TarjetaHorario extends StatelessWidget {
+  final Horarioentidad horario;
+  final VoidCallback alEliminar;
+
+  const _TarjetaHorario(this.horario, {required this.alEliminar});
+
+  @override
+  Widget build(BuildContext context) {
+    return TarjetaSeccion(
+      child: Row(
+        children: [
+          const CajaIcono(Icons.calendar_month_outlined, lado: 56),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  DiaSemana.etiqueta(horario.dia),
+                  style: Tipografia.subtitulo1(color: ColorTheme.primary),
+                ),
+                const SizedBox(height: 4),
+                _Detalle(
+                  Icons.schedule,
+                  '${FormatDate.horaLegible(horario.horaInicio)} – '
+                  '${FormatDate.horaLegible(horario.horaFin)}',
+                ),
+                const SizedBox(height: 2),
+                _Detalle(Icons.home_outlined, horario.escenario),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Eliminar horario',
+            onPressed: alEliminar,
+            icon: const Icon(Icons.delete_outline, color: ColorTheme.neutral),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Detalle extends StatelessWidget {
+  final IconData icono;
+  final String texto;
+  const _Detalle(this.icono, this.texto);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icono, size: 16, color: ColorTheme.primaryLight),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            texto,
+            style: Tipografia.leyenda(color: ColorTheme.neutral),
+          ),
+        ),
+      ],
+    );
   }
 }
 

@@ -24,6 +24,9 @@ import 'package:dpt_movil/domain/servicios/servicioClase.dart';
 import 'package:dpt_movil/domain/servicios/servicioCurso.dart';
 import 'package:dpt_movil/domain/servicios/servicioGrupo.dart';
 import 'package:dpt_movil/domain/servicios/servicioHorario.dart';
+import 'package:dpt_movil/domain/servicios/servicio_instructor.dart';
+import 'package:dpt_movil/data/repositories/instructoresRepositorio.dart';
+import 'package:dpt_movil/data/models/instructorModelo.dart';
 import 'package:dpt_movil/presentation/viewmodels/autenticacionViewModel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,6 +41,7 @@ import '../dobles/conexionautenticacionFalsa.dart';
 import '../dobles/conexionclasesFalsa.dart';
 import '../dobles/conexiongruposFalsa.dart';
 import '../dobles/conexionhorariosFalsa.dart';
+import '../dobles/conexioninstructoresFalsa.dart';
 import '../dobles/googleSignInFalso.dart';
 import 'package:dpt_movil/data/api/sesion/almacenToken.dart';
 
@@ -86,7 +90,7 @@ class MontajeAtenciones {
     DateTime.now().day,
   );
   static String get textoClase =>
-      'Fecha clase: ${FormatDate.fechaACadena(hoy, '-')}';
+      FormatDate.fechaConDia(hoy);
   static const String textoGrupo = 'Iniciacion-2026-1';
 
   List<SingleChildWidget> _servicios() => [
@@ -151,6 +155,24 @@ class MontajeAtenciones {
                         tituloCategoria: 'Deportes',
                         descripcion: 'Desc',
                       ),
+                    ),
+            ),
+          ),
+    ),
+    //la ruta grupo pide el nombre del instructor para el encabezado
+    Provider<ServicioInstructor>(
+      create:
+          (_) => ServicioInstructor(
+            Instructoresrepositorio(
+              conexion:
+                  ConexioninstructoresFalsa()
+                    ..respuestaInstructores = RespuestaModelo(
+                      codigoHttp: 200,
+                      datos:
+                          (leerContrato('instructores', 'instructores_200')
+                                  as List)
+                              .map(Instructormodelo.fromJson)
+                              .toList(),
                     ),
             ),
           ),
@@ -237,7 +259,8 @@ class MontajeAtenciones {
     await tester.tap(find.text('Mis grupos'));
     await tester.pumpAndSettle();
     await _tocar(tester, find.text(textoGrupo));
-    await _tocar(tester, find.text(textoClase));
+    //la lista de clases puede quedar debajo de la pantalla del grupo
+    await _tocar(tester, find.text(textoClase, skipOffstage: false));
   }
 
   Future<void> _tocar(WidgetTester tester, Finder destino) async {

@@ -1,24 +1,18 @@
-import 'dart:typed_data';
-
-import 'package:dpt_movil/config/routes/roles.dart';
-import 'package:dpt_movil/domain/entities/cursoEntidad.dart';
+import 'package:dpt_movil/config/theme/color_tema.dart';
+import 'package:dpt_movil/config/theme/tipografia.dart';
 import 'package:dpt_movil/domain/entities/grupoEntidad.dart';
+import 'package:dpt_movil/presentation/view/views/grupo/encabezadoGrupo.dart';
 import 'package:dpt_movil/presentation/view/views/grupo/widgetListaAlumnos.dart';
 import 'package:dpt_movil/presentation/view/views/grupo/widgetListaClases.dart';
 import 'package:dpt_movil/presentation/view/views/grupo/widgetListaHorarios.dart';
-import 'package:dpt_movil/presentation/viewmodels/autenticacionViewModel.dart';
-import 'package:dpt_movil/presentation/viewmodels/detalleGrupoViewModel.dart';
-import 'package:flutter/material.dart';
-import 'package:dpt_movil/config/theme/color_tema.dart';
-import 'package:dpt_movil/config/theme/tipografia.dart';
 import 'package:dpt_movil/presentation/view/widgets/bar.dart';
-import 'package:dpt_movil/presentation/view/widgets/campoBusqueda.dart';
-import 'package:dpt_movil/presentation/view/widgets/edit_icon.dart';
-import 'package:dpt_movil/presentation/view/widgets/encabezadoImagen.dart';
 import 'package:dpt_movil/presentation/view/widgets/menuLateral.dart';
-import 'package:dpt_movil/presentation/view/widgets/mini_tarjeta.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/material.dart';
 
+//pantalla de un grupo (rediseño del 2026-11-20, prototipo del cliente): el
+//encabezado y, debajo, las secciones Horario, Asistencias y Alumnos con una
+//barra de pestanas que queda fija arriba y lleva a cada una. La informacion
+//del curso se omite por ahora (decision del 2026-11-20)
 class Grupo extends StatelessWidget {
   Grupoentidad grupo;
   Grupo({super.key, required this.grupo});
@@ -26,182 +20,174 @@ class Grupo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: Bar(title: '${grupo.curso} ${grupo.anio}.${grupo.iterable}'),
-      drawer: Builder(builder: (context)=> Menulateral()),
-      body: contenedorSeguro(context),
+      appBar: Bar(),
+      drawer: Builder(builder: (context) => Menulateral()),
+      body: const SafeArea(child: _CuerpoGrupo()),
+    );
+  }
+}
+
+class _CuerpoGrupo extends StatefulWidget {
+  const _CuerpoGrupo();
+
+  @override
+  State<_CuerpoGrupo> createState() => _CuerpoGrupoState();
+}
+
+class _CuerpoGrupoState extends State<_CuerpoGrupo> {
+  static const double _altoPestanas = 52;
+
+  final _desplazamiento = ScrollController();
+  final _claveHorario = GlobalKey();
+  final _claveAsistencias = GlobalKey();
+  final _claveAlumnos = GlobalKey();
+
+  @override
+  void dispose() {
+    _desplazamiento.dispose();
+    super.dispose();
+  }
+
+  //lleva el titulo de la seccion justo debajo de la barra de pestanas (el
+  //visor ya descuenta la barra fija al revelar)
+  void _irA(GlobalKey clave) {
+    final contexto = clave.currentContext;
+    if (contexto == null) return;
+    Scrollable.ensureVisible(
+      contexto,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOut,
     );
   }
 
-  Widget contenedorSeguro(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            EncabezadoImagen(),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              child: contenedor(context),
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      controller: _desplazamiento,
+      slivers: [
+        const SliverPadding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 16),
+          sliver: SliverToBoxAdapter(child: EncabezadoGrupo()),
+        ),
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _DelegadoPestanas(
+            alto: _altoPestanas,
+            pestanas: {
+              'Horario': () => _irA(_claveHorario),
+              'Asistencias': () => _irA(_claveAsistencias),
+              'Alumnos': () => _irA(_claveAlumnos),
+            },
+          ),
+        ),
+        //las secciones van en un solo sliver: se construyen de una vez y las
+        //pestanas encuentran su posicion. Mientras ese sliver no asoma en
+        //pantalla, las pruebas lo buscan con skipOffstage: false
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Widgetlistahorarios(key: _claveHorario),
+                const _Separador(),
+                Widgetlistaclases(key: _claveAsistencias),
+                const _Separador(),
+                Widgetlistaalumnos(key: _claveAlumnos),
+                const SizedBox(height: 24),
+                const _BotonesCierre(),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget contenedor(BuildContext context) {
-    //cambiar el instructor es del coordinador: los demas no ven el boton
-    //(AS-01). La tarjeta aun es una maqueta: el nombre es fijo y el boton no
-    //hace nada
-    final esCoordinador = context.select<AutenticacionViewModel, bool>(
-      (vm) => vm.perfilSesion?.role == Roles.coordinador,
-    );
-    return Column(
-      children: [
-        CampoBusqueda(leyenda: 'buscar instructor...'),
-        MiniTarjeta(
-          existeCampoImagen: true,
-          atrMargerSuperior: 15,
-          atrMargerInferior: 15,
-          atrTitulo: 'Edynson Muñoz Jimenez',
-          atrSubTitulo: 'Instructor',
-          existeBotonCierre: esCoordinador,
-          atrDatosImagen: Uint8List(0),
-        ),
-        informacionCurso(context),
-        informacionGrupo(),
-        cupos(),
-        const Widgetlistahorarios(),
-        const Widgetlistaalumnos(),
-        const Widgetlistaclases(),
-        botonesCierre(),
       ],
     );
   }
+}
 
-  Widget botonesCierre() {
-    return Container(
-      child: Column(
+class _Separador extends StatelessWidget {
+  const _Separador();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.symmetric(vertical: 24),
+    child: Divider(height: 1, color: ColorTheme.asistenciaBorde),
+  );
+}
+
+//barra blanca con las pestanas; fija arriba al desplazar
+class _DelegadoPestanas extends SliverPersistentHeaderDelegate {
+  final double alto;
+  final Map<String, VoidCallback> pestanas;
+
+  _DelegadoPestanas({required this.alto, required this.pestanas});
+
+  @override
+  double get minExtent => alto;
+
+  @override
+  double get maxExtent => alto;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Material(
+      color: Colors.white,
+      elevation: overlapsContent || shrinkOffset > 0 ? 2 : 0,
+      shadowColor: ColorTheme.primary.withValues(alpha: 0.2),
+      child: Row(
         children: [
-          OutlinedButton(
-            onPressed: () {},
-            child: Text('FINALIZAR GRUPO'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: ColorTheme.secondary,
-              side: BorderSide(color: ColorTheme.secondary),
+          for (final pestana in pestanas.entries)
+            Expanded(
+              child: InkWell(
+                onTap: pestana.value,
+                child: Center(
+                  child: Text(
+                    pestana.key,
+                    style: Tipografia.boton1(color: ColorTheme.primary),
+                  ),
+                ),
+              ),
             ),
-          ),
-          FilledButton(
-            onPressed: () {},
-            child: Text('ELIMINAR GRUPO'),
-            style: FilledButton.styleFrom(
-              backgroundColor: ColorTheme.secondary,
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget cupos() {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 10),
-      child: Stack(
-        children: [
-          Column(
-            children: [
-              ListTile(
-                title: Text('Cupos', style: Tipografia.cuerpo1()),
-                subtitle: Text('${grupo.cupos}', style: Tipografia.cuerpo2()),
-              ),
-              ListTile(
-                title: Text('Matriculados', style: Tipografia.cuerpo1()),
-                subtitle: Text('20', style: Tipografia.cuerpo2()),
-              ),
-            ],
+  @override
+  bool shouldRebuild(_DelegadoPestanas anterior) =>
+      anterior.alto != alto || anterior.pestanas != pestanas;
+}
+
+//aun sin accion (O-02): se conservan al final de la pantalla
+class _BotonesCierre extends StatelessWidget {
+  const _BotonesCierre();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton(
+          onPressed: () {},
+          style: OutlinedButton.styleFrom(
+            foregroundColor: ColorTheme.secondary,
+            side: const BorderSide(color: ColorTheme.secondary),
           ),
-          Positioned(child: EditIcon(), top: 8, right: 8),
-        ],
-      ),
-    );
-  }
-
-  Widget informacionCurso(BuildContext context) {
-    //el vm lo crea la ruta grupo y carga el curso al entrar; solo se
-    //reconstruye cuando cambia esta seccion
-    final seccion = context
-        .select<DetalleGrupoViewModel, EstadoSeccion<CursoEntidad?>>(
-          (vm) => vm.curso,
-        );
-    if (seccion.cargando) {
-      return CircularProgressIndicator();
-    }
-    if (seccion.error != null || seccion.datos == null) {
-      return Text(
-        'no se logro obtener informacion: ${seccion.error}',
-        style: Tipografia.cuerpo1(color: ColorTheme.error),
-      );
-    }
-    return mostrarInfoCurso(seccion.datos!);
-  }
-
-  Widget mostrarInfoCurso(CursoEntidad curso) {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 10),
-      child: Card(
-        elevation: 4,
-        child: Column(
-          children: [
-            Text('Informacion del curso', style: Tipografia.h6()),
-            ListTile(
-              title: Text('Curso', style: Tipografia.cuerpo1()),
-              subtitle: Text(
-                '${curso.nombreCurso} - ${curso.tituloCategoria}',
-                style: Tipografia.cuerpo2(),
-              ),
-            ),
-            ListTile(
-              title: Text('Descripcion', style: Tipografia.cuerpo1()),
-              subtitle: Text(style: Tipografia.cuerpo2(), curso.descripcion),
-            ),
-          ],
+          child: const Text('FINALIZAR GRUPO'),
         ),
-      ),
-    );
-  }
-
-  Widget informacionGrupo() {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 10),
-      child: Card(
-        elevation: 4,
-        child: Column(
-          children: [
-            Text('Informacion del Grupo', style: Tipografia.h6()),
-            ListTile(
-              title: Text('Grupo', style: Tipografia.cuerpo1()),
-              subtitle: Text(
-                '${grupo.curso}: ${grupo.anio}.${grupo.iterable} - ${grupo.categoria}',
-                style: Tipografia.cuerpo2(),
-              ),
-            ),
-            ListTile(
-              title: Text('Estado', style: Tipografia.cuerpo1()),
-              subtitle: Text('Activo', style: Tipografia.cuerpo2()),
-            ),
-            ListTile(
-              title: Text('Fecha de creacion', style: Tipografia.cuerpo1()),
-              subtitle: Text(grupo.fechaCreacion, style: Tipografia.cuerpo2()),
-            ),
-            ListTile(
-              title: Text('Fecha finalizacion', style: Tipografia.cuerpo1()),
-              subtitle: Text(
-                '${grupo.fechaFinalizacion}',
-                style: Tipografia.cuerpo2(),
-              ),
-            ),
-          ],
+        const SizedBox(height: 8),
+        FilledButton(
+          onPressed: () {},
+          style: FilledButton.styleFrom(
+            backgroundColor: ColorTheme.secondary,
+          ),
+          child: const Text('ELIMINAR GRUPO'),
         ),
-      ),
+      ],
     );
   }
 }

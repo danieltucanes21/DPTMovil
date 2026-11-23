@@ -11,6 +11,8 @@ import 'package:dpt_movil/domain/servicios/servicioAlumno.dart';
 import 'package:dpt_movil/domain/servicios/servicioClase.dart';
 import 'package:dpt_movil/domain/servicios/servicioCurso.dart';
 import 'package:dpt_movil/domain/servicios/servicioHorario.dart';
+import 'package:dpt_movil/domain/servicios/servicio_instructor.dart';
+import 'package:dpt_movil/domain/entities/instructorEntidad.dart';
 import 'package:dpt_movil/presentation/viewmodels/estadoSeccion.dart';
 import 'package:flutter/foundation.dart';
 
@@ -29,6 +31,9 @@ class DetalleGrupoViewModel with ChangeNotifier, NotificacionSegura {
   final Serviciohorario _servicioHorario;
   final Servicioalumno _servicioAlumno;
   final Servicioclase _servicioClase;
+  //para el nombre del instructor del encabezado; opcional para no tocar las
+  //pruebas que no pintan el encabezado (sin el, el nombre no se carga)
+  final ServicioInstructor? _servicioInstructor;
 
   //hora actual para la ventana de asistencia (AS-13); las pruebas la fijan
   final DateTime Function() _reloj;
@@ -40,7 +45,13 @@ class DetalleGrupoViewModel with ChangeNotifier, NotificacionSegura {
     this._servicioAlumno,
     this._servicioClase, {
     DateTime Function()? reloj,
-  }) : _reloj = reloj ?? DateTime.now;
+    ServicioInstructor? servicioInstructor,
+  }) : _reloj = reloj ?? DateTime.now,
+       _servicioInstructor = servicioInstructor,
+       _instructor = EstadoSeccion(
+         null,
+         cargando: grupo.idInstructor != null && servicioInstructor != null,
+       );
 
   //todas empiezan cargando: la ruta llama a cargar() al crear el vm
   EstadoSeccion<CursoEntidad?> _curso = const EstadoSeccion(null, cargando: true);
@@ -57,19 +68,69 @@ class DetalleGrupoViewModel with ChangeNotifier, NotificacionSegura {
     cargando: true,
   );
 
+  //nombre del instructor del grupo. datos null sin cargando ni error: el grupo
+  //no tiene instructor (o no se pidio)
+  EstadoSeccion<String?> _instructor;
+
   EstadoSeccion<CursoEntidad?> get curso => _curso;
+  EstadoSeccion<String?> get instructor => _instructor;
   EstadoSeccion<List<Horarioentidad>> get horarios => _horarios;
   EstadoSeccion<List<Alumnoentidad>> get alumnos => _alumnos;
   EstadoSeccion<List<Claseentidad>> get clases => _clases;
 
-  //las cuatro peticiones van en paralelo; cada seccion notifica al llegar
+  //--- encabezado ---
+  //el grupo termino segun su fecha de finalizacion (hoy, con el reloj del vm)
+  bool get finalizado => grupo.finalizado(_reloj());
+
+  //alumnos inscritos; null mientras carga la lista o si fallo
+  int? get inscritos =>
+      _alumnos.cargando || _alumnos.error != null
+          ? null
+          : _alumnos.datos.length;
+
+  //cupos libres; nunca negativo
+  int? get disponibles {
+    final ocupados = inscritos;
+    if (ocupados == null) return null;
+    final libres = grupo.cupos - ocupados;
+    return libres < 0 ? 0 : libres;
+  }
+
+  //las peticiones van en paralelo; cada seccion notifica al llegar
   Future<void> cargar() async {
     await Future.wait([
+      _cargarInstructor(),
       _cargarCurso(),
       _cargarHorarios(),
       _cargarAlumnos(),
       cargarClases(),
     ]);
+  }
+
+  //no hay una ruta por id en la app: se busca en /instructores
+  Future<void> _cargarInstructor() async {
+    final id = grupo.idInstructor;
+    final servicio = _servicioInstructor;
+    if (id == null || servicio == null) return;
+    try {
+      final respuesta = await servicio.listarInstructores();
+      if (respuesta.codigoHttp == 200 && respuesta.datos is List) {
+        final encontrado = (respuesta.datos as List)
+            .whereType<Instructorentidad>()
+            .where((i) => i.id == id);
+        final nombre =
+            encontrado.isEmpty ? null : encontrado.first.nombre?.trim();
+        _instructor =
+            (nombre == null || nombre.isEmpty)
+                ? EstadoSeccion(null, error: 'Instructor no encontrado')
+                : EstadoSeccion(nombre);
+      } else {
+        _instructor = EstadoSeccion(null, error: _mensaje(respuesta));
+      }
+    } catch (e) {
+      _instructor = EstadoSeccion(null, error: e.toString());
+    }
+    notifyListeners();
   }
 
   Future<void> _cargarCurso() async {
@@ -249,6 +310,14 @@ class DetalleGrupoViewModel with ChangeNotifier, NotificacionSegura {
           '${VentanaAsistencia.horaCorta(delDia.first.horaInicio)}';
     }
     return null;
+  }
+
+  //el primer horario del dia de la semana de esa fecha, para mostrar dia y
+  //hora en la toma de asistencia; null si ese dia no hay horario
+  Horarioentidad? horarioDe(DateTime? fecha) {
+    if (fecha == null) return null;
+    final delDia = VentanaAsistencia.horariosDelDia(_horarios.datos, fecha);
+    return delDia.isEmpty ? null : delDia.first;
   }
 
   //la clase de la lista se abre para marcar (true) o solo para consultar

@@ -158,7 +158,7 @@ void main() {
     //la tarjeta de la clase queda debajo de las demas secciones, fuera de la
     //ventana de prueba: se desplaza hasta ella antes de tocarla
     Future<void> abrirClase(WidgetTester tester) async {
-      final tarjeta = find.text('Fecha clase: 2026-10-20');
+      final tarjeta = find.text('Martes, 20 de octubre', skipOffstage: false);
       expect(tarjeta, findsOneWidget);
       await tester.ensureVisible(tarjeta);
       await tester.pumpAndSettle();
@@ -168,11 +168,11 @@ void main() {
 
     //lo que nadie salvo el responsable del grupo deberia poder hacer
     Future<void> comprobarSinAccesoAAsistencia(WidgetTester tester) async {
-      expect(find.text('Fecha clase: 2026-10-20'), findsOneWidget);
+      expect(find.text('Martes, 20 de octubre', skipOffstage: false), findsOneWidget);
       //se anotan todas las faltas antes de afirmar: asi el rojo dice cuales
       //permisos sobran y no solo el primero
       final faltas = <String>[];
-      if (find.text('TOMAR ASISTENCIA').evaluate().isNotEmpty) {
+      if (find.text('Tomar asistencia', skipOffstage: false).evaluate().isNotEmpty) {
         faltas.add('ve TOMAR ASISTENCIA');
       }
       await abrirClase(tester);
@@ -230,17 +230,17 @@ void main() {
       vmSesion.perfilSesion = perfil('coo1', Roles.coordinador);
       await montarGrupo(tester);
 
-      expect(find.text('TOMAR ASISTENCIA'), findsOneWidget);
+      expect(find.text('Tomar asistencia', skipOffstage: false), findsOneWidget);
       //desde AS-13 las clases no se agregan ni se eliminan a mano
       expect(find.text('AGREGAR CLASE'), findsNothing);
-      //en la tarjeta de la clase; la del instructor (maqueta, O-02) si tiene X
+      //en la tarjeta de la clase no hay X
       expect(
         find.descendant(
           of: find.ancestor(
-            of: find.text('Fecha clase: 2026-10-20'),
-            matching: find.byType(InkWell),
+            of: find.text('Martes, 20 de octubre', skipOffstage: false),
+            matching: find.byType(InkWell, skipOffstage: false),
           ),
-          matching: find.byIcon(Icons.close),
+          matching: find.byIcon(Icons.close, skipOffstage: false),
         ),
         findsNothing,
       );
