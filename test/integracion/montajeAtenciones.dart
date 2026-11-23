@@ -1,3 +1,4 @@
+import 'package:dpt_movil/config/formatDate.dart';
 import 'package:dpt_movil/config/routes/app_rutas.dart';
 import 'package:dpt_movil/config/routes/roles.dart';
 import 'package:dpt_movil/config/routes/route_generator.dart';
@@ -5,6 +6,7 @@ import 'package:dpt_movil/data/api/conexion/remoto/ConexionAtencionesRemoto.dart
 import 'package:dpt_movil/data/models/claseModelo.dart';
 import 'package:dpt_movil/data/models/cursoModelo.dart';
 import 'package:dpt_movil/data/models/grupoModelo.dart';
+import 'package:dpt_movil/data/models/horarioModelo.dart';
 import 'package:dpt_movil/data/models/respuestaModelo.dart';
 import 'package:dpt_movil/data/repositories/alumnosRepositorio.dart';
 import 'package:dpt_movil/data/repositories/atencionesRepositorio.dart';
@@ -14,6 +16,7 @@ import 'package:dpt_movil/data/repositories/cursoRepositorio.dart';
 import 'package:dpt_movil/data/repositories/grupoRepositorio.dart';
 import 'package:dpt_movil/data/repositories/horarioRepositorio.dart';
 import 'package:dpt_movil/domain/entities/PerfilEntidad.dart';
+import 'package:dpt_movil/domain/entities/diaSemana.dart';
 import 'package:dpt_movil/domain/servicios/servicioAlumno.dart';
 import 'package:dpt_movil/domain/servicios/servicioAtencion.dart';
 import 'package:dpt_movil/domain/servicios/servicioAutenticacion.dart';
@@ -21,6 +24,9 @@ import 'package:dpt_movil/domain/servicios/servicioClase.dart';
 import 'package:dpt_movil/domain/servicios/servicioCurso.dart';
 import 'package:dpt_movil/domain/servicios/servicioGrupo.dart';
 import 'package:dpt_movil/domain/servicios/servicioHorario.dart';
+import 'package:dpt_movil/domain/servicios/servicio_instructor.dart';
+import 'package:dpt_movil/data/repositories/instructoresRepositorio.dart';
+import 'package:dpt_movil/data/models/instructorModelo.dart';
 import 'package:dpt_movil/presentation/viewmodels/autenticacionViewModel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,6 +41,7 @@ import '../dobles/conexionautenticacionFalsa.dart';
 import '../dobles/conexionclasesFalsa.dart';
 import '../dobles/conexiongruposFalsa.dart';
 import '../dobles/conexionhorariosFalsa.dart';
+import '../dobles/conexioninstructoresFalsa.dart';
 import '../dobles/googleSignInFalso.dart';
 import 'package:dpt_movil/data/api/sesion/almacenToken.dart';
 
@@ -74,7 +81,16 @@ class MontajeAtenciones {
     );
   }
 
-  static const String textoClase = 'Fecha clase: 2026-10-20';
+  //la clase 210 es de hoy y el grupo tiene horario hoy desde las 00:00: asi
+  //el instructor la abre dentro de la ventana de asistencia (AS-13), que la
+  //ruta grupo calcula con el reloj real
+  static final DateTime hoy = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+  );
+  static String get textoClase =>
+      FormatDate.fechaConDia(hoy);
   static const String textoGrupo = 'Iniciacion-2026-1';
 
   List<SingleChildWidget> _servicios() => [
@@ -109,7 +125,18 @@ class MontajeAtenciones {
                   ConexionhorariosFalsa()
                     ..respuestaHorarios = RespuestaModelo(
                       codigoHttp: 200,
-                      datos: [],
+                      datos: [
+                        HorarioModelo(
+                          categoria: 'Deportes',
+                          curso: 'Iniciacion',
+                          anio: 2026,
+                          iterable: 1,
+                          dia: DiaSemana.codigos[hoy.weekday - 1],
+                          horaInicio: '00:00',
+                          horaFin: '23:59',
+                          escenario: 'Coliseo',
+                        ),
+                      ],
                     ),
             ),
           ),
@@ -128,6 +155,24 @@ class MontajeAtenciones {
                         tituloCategoria: 'Deportes',
                         descripcion: 'Desc',
                       ),
+                    ),
+            ),
+          ),
+    ),
+    //la ruta grupo pide el nombre del instructor para el encabezado
+    Provider<ServicioInstructor>(
+      create:
+          (_) => ServicioInstructor(
+            Instructoresrepositorio(
+              conexion:
+                  ConexioninstructoresFalsa()
+                    ..respuestaInstructores = RespuestaModelo(
+                      codigoHttp: 200,
+                      datos:
+                          (leerContrato('instructores', 'instructores_200')
+                                  as List)
+                              .map(Instructormodelo.fromJson)
+                              .toList(),
                     ),
             ),
           ),
@@ -158,7 +203,7 @@ class MontajeAtenciones {
                           idGrupoAnio: 2026,
                           idGrupoIterable: 1,
                           idInstructor: 'ins1',
-                          fecha: DateTime(2026, 10, 20),
+                          fecha: hoy,
                           horas: 2,
                           minutos: 0,
                           eliminado: 0,
@@ -214,7 +259,8 @@ class MontajeAtenciones {
     await tester.tap(find.text('Mis grupos'));
     await tester.pumpAndSettle();
     await _tocar(tester, find.text(textoGrupo));
-    await _tocar(tester, find.text(textoClase));
+    //la lista de clases puede quedar debajo de la pantalla del grupo
+    await _tocar(tester, find.text(textoClase, skipOffstage: false));
   }
 
   Future<void> _tocar(WidgetTester tester, Finder destino) async {

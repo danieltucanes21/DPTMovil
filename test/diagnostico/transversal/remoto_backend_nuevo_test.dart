@@ -2,15 +2,9 @@
 library;
 
 import 'package:dpt_movil/config/formatDate.dart';
-import 'package:dpt_movil/data/api/conexion/remoto/ConexionAutenticacionRemoto.dart';
-import 'package:dpt_movil/data/api/sesion/almacenToken.dart';
-import 'package:dpt_movil/data/repositories/autenticacionRepositorio.dart';
 import 'package:dpt_movil/domain/entities/grupoEntidad.dart';
-import 'package:dpt_movil/domain/servicios/servicioAutenticacion.dart';
-import 'package:dpt_movil/presentation/viewmodels/autenticacionViewModel.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../dobles/googleSignInFalso.dart';
 import '../../main_test.dart'
     show
         baseUrlPruebas,
@@ -96,26 +90,8 @@ void main() {
       expect(vm.horariosDe(g).datos, isEmpty);
     });
 
-    //el menu ofrece "Continuar con correo", que llama GET /login sin JWT.
-    //VmLoginTest.prueba1 pasa porque la suite si manda un token
-    test('$capa - $tipo - Login - BUG BK-11 - el inicio con correo responde sin exigir un JWT que aun no existe', () async {
-      almacenPruebas.token = null;
-      final vm = AutenticacionViewModel(
-        Servicioautenticacion(
-          Autenticacionrepositorio(
-            conexion: Conexionautenticacionremoto(
-              crearDioPruebas(baseUrlPruebas),
-            ),
-            almacenToken: AlmacenToken(),
-          ),
-        ),
-        GoogleSignInFalso(),
-      );
-      vm.prepararLoginConCorreo('prueba_no_registrado@noexiste.test');
-
-      final respuesta = await vm.login();
-
-      expect(respuesta.codigoHttp, isNot(401));
-    });
+    //BK-11 (corregido el 2026-11-20): se quito la entrada con correo. Lo fija
+    //integracion/autenticacion_integracion_test · "iniciar sesion va directo
+    //a Google, sin entrada por correo"
   });
 }

@@ -111,6 +111,7 @@ Route<dynamic> _construirRuta(RouteSettings settings) {
                     c.read(),
                     c.read(),
                     c.read(),
+                    servicioInstructor: c.read(),
                   )..cargar(),
               child: Grupo(grupo: datos),
             ),
@@ -203,7 +204,12 @@ Route<dynamic> _construirRuta(RouteSettings settings) {
                   (c) =>
                       Atencionviewmodel(c.read())
                         ..cargarAtenciones(datos.grupo, datos.clase),
-              child: Claseview(grupo: datos.grupo, clase: datos.clase),
+              child: Claseview(
+                grupo: datos.grupo,
+                clase: datos.clase,
+                soloLectura: datos.soloLectura,
+                horario: datos.horario,
+              ),
             ),
       );
 

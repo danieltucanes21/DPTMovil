@@ -88,7 +88,21 @@ void main() {
       final lista = respuesta.datos as List<Atencionmodelo>;
       expect(lista.map((a) => a.alumno.nombre), ['Ana Gomez', 'Luis Perez', 'Marta Ruiz']);
       expect(lista.map((a) => a.estaAtendido), [false, false, true]);
+      expect(lista.every((a) => a.marcada), isTrue);
       expect(lista.every((a) => a.idClase == 210), isTrue);
+    });
+
+    test('$capa - $tipo - Listar atenciones - un alumno sin fila en la clase queda sin marca', () async {
+      //solo Marta tiene fila: Ana y Luis aun no tienen marca
+      programarCarga(marcas: [
+        {'idClase': 210, 'idPerfil': '1061003', 'estaAtendido': true},
+      ]);
+
+      final respuesta = await obtener();
+
+      final lista = respuesta.datos as List<Atencionmodelo>;
+      expect(lista.map((a) => a.marcada), [false, false, true]);
+      expect(lista.map((a) => a.estaAtendido), [false, false, true]);
     });
 
     test('$capa - $tipo - Listar atenciones - clase sin marcas (GC-0002) deja a todos ausentes', () async {
@@ -98,6 +112,8 @@ void main() {
 
       expect(respuesta.codigoHttp, 200);
       expect((respuesta.datos as List<Atencionmodelo>).map((a) => a.estaAtendido), [false, false, false]);
+      //ninguno tiene marca: la pantalla los mostrara presentes
+      expect((respuesta.datos as List<Atencionmodelo>).map((a) => a.marcada), [false, false, false]);
     });
 
     test('$capa - $tipo - Listar atenciones - grupo sin alumnos (GC-0002) es lista vacia', () async {

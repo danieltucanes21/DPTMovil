@@ -75,19 +75,6 @@ class AutenticacionViewModel with ChangeNotifier {
     }
   }
 
-  bool prepararLoginConCorreo(String email) {
-    final correo = email.trim();
-    if (correo.isEmpty) {
-      error = 'Ingresa un correo para continuar';
-      return false;
-    }
-
-    _correoAutenticado = correo;
-    _nombreAutenticado = null;
-    error = null;
-    return true;
-  }
-
   Future<void> logout() async {
     //primero el JWT: sin el, ninguna peticion sale autenticada
     _servicio.cerrarSesion();
@@ -104,39 +91,20 @@ class AutenticacionViewModel with ChangeNotifier {
     notifyListeners();
   }
 
-  //con cuenta de Google: el backend exige su ID Token (POST /auth/token) y
-  //devuelve el perfil y el JWT de la sesion. Solo con correo: GET /login,
-  //que el backend nuevo rechaza con 401 sin JWT (AU-B01)
+  //solo con cuenta de Google: el backend exige su ID Token (POST /auth/token)
+  //y devuelve el perfil y el JWT de la sesion. La entrada solo con correo
+  //(GET /login) se quito: el backend la rechaza con 401 sin JWT (BK-11)
   Future<RespuestaModelo> login() async {
     final cuentaGoogle = cuenta;
-    if (cuentaGoogle != null) {
-      return _loginConGoogle(cuentaGoogle);
-    }
-    try {
-      final correo = correoAutenticado;
-      if (correo == null || correo.isEmpty) {
-        return RespuestaModelo.fromException(
-          Exception('No hay un correo autenticado para iniciar sesion'),
-          "GET",
-          "login",
-          "viewmodel",
-        );
-      }
-
-      RespuestaModelo respuesta = await _servicio.login(correo);
-      if (respuesta.codigoHttp == 200 && respuesta.datos != null) {
-        perfilSesion = respuesta.datos as PerfilEntidad;
-        notifyListeners();
-      }
-      return respuesta;
-    } on Exception catch (exception) {
+    if (cuentaGoogle == null) {
       return RespuestaModelo.fromException(
-        exception,
-        "GET",
-        "login",
+        Exception('No hay una cuenta de Google para iniciar sesion'),
+        "POST",
+        "auth/token",
         "viewmodel",
       );
     }
+    return _loginConGoogle(cuentaGoogle);
   }
 
   Future<RespuestaModelo> _loginConGoogle(GoogleSignInAccount cuentaGoogle) async {
@@ -224,15 +192,12 @@ class AutenticacionViewModel with ChangeNotifier {
     }
   }
 
-  //mensaje legible de un inicio de sesion fallido que no es 404 (AU-08). El
-  //401 sin cuerpo de /login es lo que responde el backend nuevo a quien entra
-  //solo con el correo (BK-11); de /auth/token, que rechazo el ID Token
+  //mensaje legible de un inicio de sesion fallido que no es 404 (AU-08). Un
+  //401 de /auth/token es que rechazo el ID Token
   String mensajeErrorLogin(RespuestaModelo respuesta) {
     switch (respuesta.codigoHttp) {
       case 401:
-        return cuenta == null
-            ? 'El servidor ya no permite iniciar sesión solo con el correo. Usa «Continuar con Google».'
-            : 'El servidor no aceptó tu cuenta de Google. Intenta iniciar sesión de nuevo.';
+        return 'El servidor no aceptó tu cuenta de Google. Intenta iniciar sesión de nuevo.';
       case 403:
         return 'Tu cuenta no tiene permiso para entrar a la aplicación.';
       case 503:

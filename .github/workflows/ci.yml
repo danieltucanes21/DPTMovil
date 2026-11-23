@@ -1,4 +1,5 @@
-# CI-01 (SCRUMBAN-133): en cada push y pull request revisa el analizador y
+# CI-01 (SCRUMBAN-133): en cada push a main y en cada pull request hacia main
+# (o a mano, con workflow_dispatch) revisa el analizador y
 # corre la suite sin backend. Fuera quedan la suite remota
 # (test/main_test.dart, necesita el backend) y la de diagnostico
 # (test/diagnostico, roja a proposito).
@@ -6,7 +7,12 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
+  # rama de destino del PR
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 # un push nuevo a la misma rama cancela la corrida anterior
@@ -18,10 +24,10 @@ permissions:
   contents: read
 
 jobs:
-  analizar-y-probar:
-    name: Analizador y suite sin backend
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # el primer build del APK, sin cache de Gradle, tarda varios minutos
+    timeout-minutes: 30
     # con shell: bash explicito GitHub agrega pipefail: sin el, el "| tee" del
     # analizador ocultaria sus errores
     defaults:
@@ -33,11 +39,21 @@ jobs:
       TZ: America/Bogota
       # linea base de avisos de flutter analyze. Si una correccion la baja,
       # bajar tambien este numero; nunca subirlo para que el CI pase
-      LIMITE_AVISOS: 29
+      LIMITE_AVISOS: 27
 
     steps:
       - name: Obtener el codigo
         uses: actions/checkout@v4
+
+      # JDK 17: lo exige el Android Gradle Plugin 8.7 del proyecto para el
+      # build del APK. cache: gradle guarda las dependencias de Gradle entre
+      # corridas
+      - name: Instalar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
 
       - name: Instalar Flutter 3.41.3
         uses: subosito/flutter-action@v2
@@ -64,3 +80,9 @@ jobs:
 
       - name: Suite sin backend
         run: flutter test test/unitarias test/raiz_composicion_test.dart test/integracion
+
+      # APK de depuracion: comprueba que la app compila para Android. Va al
+      # final para que un fallo del analizador o de las pruebas se vea antes.
+      # Usa el backend por defecto (API_HOST=10.0.2.2, el emulador)
+      - name: Build del APK
+        run: flutter build apk --debug

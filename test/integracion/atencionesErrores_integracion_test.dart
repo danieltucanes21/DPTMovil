@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'montajeAtenciones.dart';
 
+import 'pantallaAsistencia.dart';
+
 //errores de la toma de asistencia de punta a punta (AS-02, AS-07): mismo
 //montaje que atenciones_integracion_test.dart. Registro:
 //auditoria-mvvm/registro-bugs.md
@@ -23,7 +25,7 @@ void main() {
     app.adaptador.responder('PUT', '/clase/210/asistencia', 201);
     await app.abrirClase(tester);
 
-    await tester.tap(find.text('Guardar'));
+    await tester.tap(botonEnviar());
     await tester.pumpAndSettle();
 
     //lo que ve el instructor, para la evidencia del registro
@@ -54,10 +56,10 @@ void main() {
     final pausa = app.adaptador.retener('PUT', '/clase/210/asistencia');
     await app.abrirClase(tester);
 
-    await tester.tap(find.text('Guardar'));
+    await tester.tap(botonEnviar());
     await tester.pump();
     //el primer envio sigue en la red y la pantalla no muestra nada
-    await tester.tap(find.text('Guardar'), warnIfMissed: false);
+    await tester.tap(botonEnviar(), warnIfMissed: false);
     await tester.pump();
     pausa.complete();
     await tester.pumpAndSettle();

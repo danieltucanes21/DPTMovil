@@ -7,6 +7,7 @@ import 'package:dpt_movil/domain/entities/atencionEntidad.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../dobles/conexionatencionesFalsa.dart';
+import 'package:dpt_movil/domain/entities/estadoAsistencia.dart';
 
 //el repositorio ya recibe su conexion por constructor, asi que se prueba
 //con el doble y sin backend. Su constructor no cambia en la fase 5
@@ -66,7 +67,7 @@ void main() {
             imagen: 12,
           ),
           idClase: 210,
-          estaAtendido: true,
+          estado: EstadoAsistencia.presente,
         ),
       ], 210);
 

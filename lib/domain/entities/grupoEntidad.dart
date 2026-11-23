@@ -62,6 +62,15 @@ class Grupoentidad {
     return EstadoInscripcion.abierta;
   }
 
+  //el grupo termino si su fecha de finalizacion ya paso; el dia de la
+  //finalizacion aun cuenta como activo. Sin fecha sigue activo. El backend no
+  //manda estado del grupo (GrupoDto no lo tiene): se deduce de la fecha
+  bool finalizado(DateTime hoy) {
+    final fin = _soloFecha(fechaFinalizacion);
+    if (fin == null) return false;
+    return fin.isBefore(DateTime(hoy.year, hoy.month, hoy.day));
+  }
+
   //yyyy-MM-dd del backend; una fecha que no se puede leer cuenta como
   //ausente
   static DateTime? _soloFecha(String? texto) {

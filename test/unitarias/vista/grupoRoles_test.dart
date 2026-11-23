@@ -32,8 +32,8 @@ import '../../dobles/conexionhorariosFalsa.dart';
 import '../../dobles/googleSignInFalso.dart';
 import 'package:dpt_movil/data/api/sesion/almacenToken.dart';
 
-//que ve cada rol en la pantalla del grupo: agregar y eliminar clases y abrir
-//la toma de asistencia son de quien dicta la clase (coordinador e instructor).
+//que ve cada rol en la pantalla del grupo: tomar asistencia y abrir las clases
+//son de quien dicta la clase (coordinador e instructor).
 //Nacio como diagnostico de AS-01 (fase 4), corregido el 2026-11-19; la ruta
 //tambien lo comprueba (AccesoRutas, prueba en unitarias/rutas/accesoRutas_test.dart)
 void main() {
@@ -158,7 +158,7 @@ void main() {
     //la tarjeta de la clase queda debajo de las demas secciones, fuera de la
     //ventana de prueba: se desplaza hasta ella antes de tocarla
     Future<void> abrirClase(WidgetTester tester) async {
-      final tarjeta = find.text('Fecha clase: 2026-10-20');
+      final tarjeta = find.text('Martes, 20 de octubre', skipOffstage: false);
       expect(tarjeta, findsOneWidget);
       await tester.ensureVisible(tarjeta);
       await tester.pumpAndSettle();
@@ -168,15 +168,12 @@ void main() {
 
     //lo que nadie salvo el responsable del grupo deberia poder hacer
     Future<void> comprobarSinAccesoAAsistencia(WidgetTester tester) async {
-      expect(find.text('Fecha clase: 2026-10-20'), findsOneWidget);
+      expect(find.text('Martes, 20 de octubre', skipOffstage: false), findsOneWidget);
       //se anotan todas las faltas antes de afirmar: asi el rojo dice cuales
       //permisos sobran y no solo el primero
       final faltas = <String>[];
-      if (find.text('AGREGAR CLASE').evaluate().isNotEmpty) {
-        faltas.add('ve AGREGAR CLASE');
-      }
-      if (find.byIcon(Icons.close).evaluate().isNotEmpty) {
-        faltas.add('ve el boton de eliminar clase');
+      if (find.text('Tomar asistencia', skipOffstage: false).evaluate().isNotEmpty) {
+        faltas.add('ve TOMAR ASISTENCIA');
       }
       await abrirClase(tester);
       if (rutasAbiertas.contains(AppRutas.clase)) {
@@ -229,12 +226,24 @@ void main() {
       expect(rutasAbiertas, contains(AppRutas.clase));
     });
 
-    testWidgets('$capa - $tipo - Grupo - el coordinador ve agregar y eliminar y abre la asistencia', (tester) async {
+    testWidgets('$capa - $tipo - Grupo - el coordinador ve tomar asistencia y abre la asistencia', (tester) async {
       vmSesion.perfilSesion = perfil('coo1', Roles.coordinador);
       await montarGrupo(tester);
 
-      expect(find.text('AGREGAR CLASE'), findsOneWidget);
-      expect(find.byIcon(Icons.close), findsWidgets);
+      expect(find.text('Tomar asistencia', skipOffstage: false), findsOneWidget);
+      //desde AS-13 las clases no se agregan ni se eliminan a mano
+      expect(find.text('AGREGAR CLASE'), findsNothing);
+      //en la tarjeta de la clase no hay X
+      expect(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Martes, 20 de octubre', skipOffstage: false),
+            matching: find.byType(InkWell, skipOffstage: false),
+          ),
+          matching: find.byIcon(Icons.close, skipOffstage: false),
+        ),
+        findsNothing,
+      );
       await abrirClase(tester);
       expect(rutasAbiertas, contains(AppRutas.clase));
     });

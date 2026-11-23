@@ -113,25 +113,31 @@ void main() {
   ) async {
     final conexion =
         ConexionautenticacionFalsa()
-          ..respuestaLogin = RespuestaModelo(
+          ..respuestaToken = RespuestaModelo(
             codigoHttp: 200,
-            datos: Perfilmodelo(
-              id: '1',
-              nombre: 'Ana',
-              correo: 'ana@unicauca.edu.co',
-              tipoId: 'CC',
-              sexo: 'F',
-              role: Roles.coordinador,
+            datos: Tokenmodelo(
+              token: 'jwt-del-sistema',
+              perfil: Perfilmodelo(
+                id: '1',
+                nombre: 'Ana',
+                correo: 'ana@unicauca.edu.co',
+                tipoId: 'CC',
+                sexo: 'F',
+                role: Roles.coordinador,
+              ),
             ),
           );
+    //sin cuenta guardada: verificarSesion no inicia sola; la elige loginGoogle
+    final google = GoogleSignInFalso();
     vmSesion = AutenticacionViewModel(
       Servicioautenticacion(Autenticacionrepositorio(conexion: conexion, almacenToken: AlmacenToken())),
-      GoogleSignInFalso(),
+      google,
     );
     await montar(tester);
     expect(find.text('Nueva categoría'), findsNothing);
 
-    vmSesion.prepararLoginConCorreo('ana@unicauca.edu.co');
+    google.cuenta = CuentaGoogleFalsa(email: 'ana@unicauca.edu.co');
+    await vmSesion.loginGoogle();
     await vmSesion.login();
     await tester.pumpAndSettle();
 
@@ -170,25 +176,31 @@ void main() {
   ) async {
     final conexion =
         ConexionautenticacionFalsa()
-          ..respuestaLogin = RespuestaModelo(
+          ..respuestaToken = RespuestaModelo(
             codigoHttp: 200,
-            datos: Perfilmodelo(
-              id: '1',
-              nombre: 'Ana',
-              correo: 'ana@unicauca.edu.co',
-              tipoId: 'CC',
-              sexo: 'F',
-              role: Roles.coordinador,
+            datos: Tokenmodelo(
+              token: 'jwt-del-sistema',
+              perfil: Perfilmodelo(
+                id: '1',
+                nombre: 'Ana',
+                correo: 'ana@unicauca.edu.co',
+                tipoId: 'CC',
+                sexo: 'F',
+                role: Roles.coordinador,
+              ),
             ),
           );
+    //sin cuenta guardada: verificarSesion no inicia sola; la elige loginGoogle
+    final google = GoogleSignInFalso();
     vmSesion = AutenticacionViewModel(
       Servicioautenticacion(Autenticacionrepositorio(conexion: conexion, almacenToken: AlmacenToken())),
-      GoogleSignInFalso(),
+      google,
     );
     await montar(tester);
     expect(conexionCategoria.llamadasListar, 1);
 
-    vmSesion.prepararLoginConCorreo('ana@unicauca.edu.co');
+    google.cuenta = CuentaGoogleFalsa(email: 'ana@unicauca.edu.co');
+    await vmSesion.loginGoogle();
     await vmSesion.login();
     await tester.pumpAndSettle();
     expect(conexionCategoria.llamadasListar, 2);

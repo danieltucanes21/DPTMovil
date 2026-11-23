@@ -9,7 +9,7 @@ class Inicio extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: Bar(title: 'Deporte para todos'), body: contenedorSeguro());
+        appBar: const Bar(), body: contenedorSeguro());
   }
 
   Widget contenedorSeguro() {

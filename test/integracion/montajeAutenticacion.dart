@@ -166,26 +166,19 @@ class MontajeAutenticacion {
     await tester.pumpAndSettle();
   }
 
-  //menu lateral → "Iniciar Sesión" → "Continuar con correo" → correo
-  Future<void> iniciarSesionConCorreo(WidgetTester tester, String correo) async {
-    await abrirMenu(tester);
-    await tester.tap(find.text(textoIniciarSesion));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Continuar con correo'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).last, correo);
-    await tester.tap(find.text('Continuar'));
-    await tester.pumpAndSettle();
-  }
-
-  //menu lateral → "Iniciar Sesión" → "Continuar con Google"; la cuenta y su
-  //ID Token salen de google.cuenta
+  //menu lateral → "Iniciar Sesión", que va directo a Google (la entrada con
+  //correo se quito, BK-11); la cuenta y su ID Token salen de google.cuenta
   Future<void> iniciarSesionConGoogle(WidgetTester tester) async {
     await abrirMenu(tester);
     await tester.tap(find.text(textoIniciarSesion));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Continuar con Google'));
-    await tester.pumpAndSettle();
+  }
+
+  //lo mismo con una cuenta de Google de ese correo, sin nombre (el registro
+  //lo pide) y con ID Token
+  Future<void> iniciarSesionComo(WidgetTester tester, String correo) async {
+    google.cuenta = CuentaGoogleFalsa(email: correo);
+    await iniciarSesionConGoogle(tester);
   }
 
   //elige una opcion de un DropdownMenu del registro por su texto de ayuda

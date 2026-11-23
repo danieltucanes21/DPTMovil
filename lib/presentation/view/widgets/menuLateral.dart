@@ -1,6 +1,7 @@
 import 'package:dpt_movil/config/routes/app_rutas.dart';
 import 'package:dpt_movil/config/routes/roles.dart';
 import 'package:dpt_movil/config/theme/color_tema.dart';
+import 'package:dpt_movil/config/theme/forma_tema.dart';
 import 'package:dpt_movil/presentation/viewmodels/autenticacionViewModel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -197,9 +198,9 @@ class Menulateral extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: seleccionado ? Colors.white : ColorTheme.primary,
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: FormaTema.radioPequeno,
         child: InkWell(
-          borderRadius: BorderRadius.circular(9),
+          borderRadius: FormaTema.radioPequeno,
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
@@ -375,38 +376,20 @@ class Menulateral extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
       ),
+      //solo con Google: el backend exige su ID Token (/auth/token). La entrada
+      //con correo se quito (BK-11): GET /login pide un JWT que aun no existe
       onTap: () async {
-        final metodo = await _seleccionarMetodoInicioSesion(context);
-        if (!context.mounted || metodo == null) {
+        final resultado = await vm.loginGoogle();
+        if (!context.mounted) return;
+
+        if (!resultado) {
+          final mensajeError =
+              vm.error ??
+              'No fue posible iniciar con Google o el acceso fue cancelado.';
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(mensajeError)));
           return;
-        }
-
-        if (metodo == _MetodoInicioSesion.google) {
-          final resultado = await vm.loginGoogle();
-          if (!context.mounted) return;
-
-          if (!resultado) {
-            final mensajeError =
-                vm.error ??
-                'No fue posible iniciar con Google o el acceso fue cancelado.';
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(mensajeError)));
-            return;
-          }
-        } else {
-          final correo = await _solicitarCorreo(context);
-          if (!context.mounted || correo == null) {
-            return;
-          }
-
-          final preparado = vm.prepararLoginConCorreo(correo);
-          if (!preparado) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(vm.error!)));
-            return;
-          }
         }
 
         await _procesarLoginBackend(vm, context);
@@ -466,73 +449,4 @@ class Menulateral extends StatelessWidget {
       ),
     );
   }
-
-  Future<_MetodoInicioSesion?> _seleccionarMetodoInicioSesion(
-    BuildContext context,
-  ) {
-    return showDialog<_MetodoInicioSesion>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text('Iniciar sesion'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(Icons.login_rounded),
-                title: Text('Continuar con Google'),
-                onTap: () {
-                  Navigator.pop(dialogContext, _MetodoInicioSesion.google);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.email_rounded),
-                title: Text('Continuar con correo'),
-                onTap: () {
-                  Navigator.pop(dialogContext, _MetodoInicioSesion.correo);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<String?> _solicitarCorreo(BuildContext context) async {
-    return showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        final controller = TextEditingController();
-
-        return AlertDialog(
-          title: Text('Ingresa tu correo'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.emailAddress,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: 'correo@ejemplo.com',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () {
-                FocusScope.of(dialogContext).unfocus();
-                Navigator.pop(dialogContext, controller.text.trim());
-              },
-              child: Text('Continuar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }
-
-enum _MetodoInicioSesion { google, correo }

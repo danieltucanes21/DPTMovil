@@ -53,12 +53,13 @@ class Conexionatencionesremoto implements Conexionatenciones {
       if (marcas.statusCode != 200) {
         return RespuestaModelo.fromResponse(marcas, metodo);
       }
-      final Set<String> presentes = {};
+      //marca de cada alumno que tiene fila en la clase; quien no aparece no
+      //tiene marca (asistio nulo)
+      final Map<String, bool> marcaPorAlumno = {};
       if (marcas.data is List) {
         for (final fila in marcas.data as List) {
-          if (fila['estaAtendido'] == true) {
-            presentes.add(fila['idPerfil'].toString());
-          }
+          marcaPorAlumno[fila['idPerfil'].toString()] =
+              fila['estaAtendido'] == true;
         }
       } else if (!_esListadoVacio(marcas.data)) {
         return _noEsLista(marcas.data, path, metodo);
@@ -68,7 +69,7 @@ class Conexionatencionesremoto implements Conexionatenciones {
           (alumnos.data as List).map((json) {
             return Atencionmodelo.fromJson({
               'alumno': json,
-              'asistio': presentes.contains(json['id'].toString()),
+              'asistio': marcaPorAlumno[json['id'].toString()],
             }, claseid);
           }).toList();
       return RespuestaModelo(codigoHttp: 200, datos: atenciones);

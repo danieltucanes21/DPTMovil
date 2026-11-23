@@ -1,6 +1,16 @@
 [
   {
     "idClase": 210,
+    "idPerfil": "1061001",
+    "estaAtendido": false
+  },
+  {
+    "idClase": 210,
+    "idPerfil": "1061002",
+    "estaAtendido": false
+  },
+  {
+    "idClase": 210,
     "idPerfil": "1061003",
     "estaAtendido": true
   }

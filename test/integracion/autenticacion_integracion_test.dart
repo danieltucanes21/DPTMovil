@@ -23,10 +23,10 @@ void main() {
   group('Autenticacion (de punta a punta sin backend):', () {
     //CAT-12 / T-04: login notifica, asi que el menu cambia sin ayuda
     testWidgets('$capa - $tipo - Login - 200 inicia la sesion y el menu muestra las opciones del rol', (tester) async {
-      m.adaptador.responder('GET', '/login', 200, leerContrato('autenticacion', 'login_200'));
+      m.adaptador.responder('POST', '/auth/token', 200, leerContrato('autenticacion', 'token_200'));
       await m.abrir(tester);
 
-      await m.iniciarSesionConCorreo(tester, 'ana@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'ana@unicauca.edu.co');
 
       expect(find.text('Email autenticado'), findsOneWidget);
       expect(m.sesion.perfilSesion?.role, Roles.coordinador);
@@ -38,10 +38,10 @@ void main() {
     });
 
     testWidgets('$capa - $tipo - Login - 404 abre el registro con el correo escrito', (tester) async {
-      m.adaptador.responder('GET', '/login', 404, {'mensaje': 'Perfil no encontrado'});
+      m.adaptador.responder('POST', '/auth/token', 404, {'mensaje': 'Perfil no encontrado'});
       await m.abrir(tester);
 
-      await m.iniciarSesionConCorreo(tester, 'beto@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'beto@unicauca.edu.co');
 
       expect(find.byType(Autenticacionview), findsOneWidget);
       expect(find.text('beto@unicauca.edu.co'), findsOneWidget);
@@ -50,10 +50,10 @@ void main() {
     });
 
     testWidgets('$capa - $tipo - Registro - 201 envia el formulario, cierra el registro e inicia la sesion', (tester) async {
-      m.adaptador.responder('GET', '/login', 404, {'mensaje': 'Perfil no encontrado'});
+      m.adaptador.responder('POST', '/auth/token', 404, {'mensaje': 'Perfil no encontrado'});
       m.adaptador.responder('POST', '/RegistroPerfilAlumno', 201, leerContrato('autenticacion', 'registro_201'));
       await m.abrir(tester);
-      await m.iniciarSesionConCorreo(tester, 'beto@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'beto@unicauca.edu.co');
 
       await m.llenarRegistro(tester);
       await tester.tap(find.text('GUARDAR'));
@@ -71,14 +71,14 @@ void main() {
     });
 
     testWidgets('$capa - $tipo - Registro - 422 muestra el motivo del backend y se queda en el formulario', (tester) async {
-      m.adaptador.responder('GET', '/login', 404, {'mensaje': 'Perfil no encontrado'});
+      m.adaptador.responder('POST', '/auth/token', 404, {'mensaje': 'Perfil no encontrado'});
       m.adaptador.responder('POST', '/RegistroPerfilAlumno', 422, {
         'codigoError': 'GC-0029',
         'mensaje': 'Los datos enviados no son validos, El programa Artes Plásticas no pertenece a la facultad fiet',
         'codigoHttp': 422,
       });
       await m.abrir(tester);
-      await m.iniciarSesionConCorreo(tester, 'beto@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'beto@unicauca.edu.co');
 
       await m.llenarRegistro(tester);
       await tester.tap(find.text('GUARDAR'));
@@ -90,10 +90,10 @@ void main() {
     });
 
     testWidgets('$capa - $tipo - Registro - administrativo envia la dependencia sin facultad, programa ni codigo', (tester) async {
-      m.adaptador.responder('GET', '/login', 404, {'mensaje': 'Perfil no encontrado'});
+      m.adaptador.responder('POST', '/auth/token', 404, {'mensaje': 'Perfil no encontrado'});
       m.adaptador.responder('POST', '/RegistroPerfilAlumno', 201, leerContrato('autenticacion', 'registro_201'));
       await m.abrir(tester);
-      await m.iniciarSesionConCorreo(tester, 'beto@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'beto@unicauca.edu.co');
 
       await tester.enterText(find.widgetWithText(TextFormField, 'Nombre completo'), 'Beto Alumno');
       await tester.enterText(find.widgetWithText(TextFormField, 'Identificacion'), '1061000002');
@@ -118,9 +118,9 @@ void main() {
     });
 
     testWidgets('$capa - $tipo - Registro - estudiante sin programa no envia la peticion', (tester) async {
-      m.adaptador.responder('GET', '/login', 404, {'mensaje': 'Perfil no encontrado'});
+      m.adaptador.responder('POST', '/auth/token', 404, {'mensaje': 'Perfil no encontrado'});
       await m.abrir(tester);
-      await m.iniciarSesionConCorreo(tester, 'beto@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'beto@unicauca.edu.co');
 
       await tester.enterText(find.widgetWithText(TextFormField, 'Nombre completo'), 'Beto Alumno');
       await tester.enterText(find.widgetWithText(TextFormField, 'Identificacion'), '1061000002');
@@ -142,9 +142,9 @@ void main() {
     testWidgets('$capa - $tipo - Registro - dos toques en GUARDAR envian un solo registro', (tester) async {
       final retenida = m.adaptador.retener('POST', '/RegistroPerfilAlumno');
       m.adaptador.responder('POST', '/RegistroPerfilAlumno', 201, leerContrato('autenticacion', 'registro_201'));
-      m.adaptador.responder('GET', '/login', 404, {'mensaje': 'Perfil no encontrado'});
+      m.adaptador.responder('POST', '/auth/token', 404, {'mensaje': 'Perfil no encontrado'});
       await m.abrir(tester);
-      await m.iniciarSesionConCorreo(tester, 'beto@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'beto@unicauca.edu.co');
       await m.llenarRegistro(tester);
 
       await tester.tap(find.text('GUARDAR'));
@@ -164,9 +164,9 @@ void main() {
     });
 
     testWidgets('$capa - $tipo - Registro - cancelar cierra el registro y no deja sesion', (tester) async {
-      m.adaptador.responder('GET', '/login', 404, {'mensaje': 'Perfil no encontrado'});
+      m.adaptador.responder('POST', '/auth/token', 404, {'mensaje': 'Perfil no encontrado'});
       await m.abrir(tester);
-      await m.iniciarSesionConCorreo(tester, 'beto@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'beto@unicauca.edu.co');
 
       await tester.tap(find.text('CANCELAR'));
       await tester.pumpAndSettle();
@@ -178,9 +178,9 @@ void main() {
     });
 
     testWidgets('$capa - $tipo - Cerrar sesion - borra la sesion y lleva a categorias', (tester) async {
-      m.adaptador.responder('GET', '/login', 200, leerContrato('autenticacion', 'login_200'));
+      m.adaptador.responder('POST', '/auth/token', 200, leerContrato('autenticacion', 'token_200'));
       await m.abrir(tester);
-      await m.iniciarSesionConCorreo(tester, 'ana@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'ana@unicauca.edu.co');
 
       await m.cerrarSesion(tester);
 
@@ -333,9 +333,9 @@ void main() {
     //AU-05 (corregido el 2026-11-19): el campo del nombre ya no se cambiaba
     //por un Text en el siguiente setState
     testWidgets('$capa - $tipo - Registro - el nombre sigue editable despues de elegir otro campo', (tester) async {
-      m.adaptador.responder('GET', '/login', 404, {'mensaje': 'Perfil no encontrado'});
+      m.adaptador.responder('POST', '/auth/token', 404, {'mensaje': 'Perfil no encontrado'});
       await m.abrir(tester);
-      await m.iniciarSesionConCorreo(tester, 'beto@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'beto@unicauca.edu.co');
 
       await tester.enterText(find.widgetWithText(TextFormField, 'Nombre completo'), 'Bet');
       await m.elegir(tester, 'Selecciona tu sexo', 'M');
@@ -346,10 +346,10 @@ void main() {
     //AU-06 (corregido el 2026-11-19): el motivo queda escrito en el
     //formulario, no en un SnackBar que se va a los 4 s
     testWidgets('$capa - $tipo - Registro - un 409 deja el formulario abierto y muestra el motivo', (tester) async {
-      m.adaptador.responder('GET', '/login', 404, {'mensaje': 'Perfil no encontrado'});
+      m.adaptador.responder('POST', '/auth/token', 404, {'mensaje': 'Perfil no encontrado'});
       m.adaptador.responder('POST', '/RegistroPerfilAlumno', 409, {'mensaje': 'El perfil ya existe'});
       await m.abrir(tester);
-      await m.iniciarSesionConCorreo(tester, 'beto@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'beto@unicauca.edu.co');
 
       await m.llenarRegistro(tester);
       await tester.tap(find.text('GUARDAR'));
@@ -362,17 +362,32 @@ void main() {
       expect(m.sesion.perfilSesion, isNull);
     });
 
-    //AU-08 (corregido el 2026-11-19). El 401 sin cuerpo es lo que responde
-    //el backend nuevo a /login sin JWT (AU-B01, BK-11)
+    //AU-08 (corregido el 2026-11-19): un 401 sin cuerpo de /auth/token (el
+    //backend rechazo el ID Token)
     testWidgets('$capa - $tipo - Login - un 401 del backend muestra un mensaje legible, no solo el codigo', (tester) async {
-      m.adaptador.responder('GET', '/login', 401);
+      m.adaptador.responder('POST', '/auth/token', 401);
       await m.abrir(tester);
 
-      await m.iniciarSesionConCorreo(tester, 'ana@unicauca.edu.co');
+      await m.iniciarSesionComo(tester, 'ana@unicauca.edu.co');
 
       expect(find.byType(SnackBar), findsOneWidget);
       expect(find.text('Error: 401'), findsNothing);
-      expect(find.textContaining('Continuar con Google'), findsOneWidget);
+      expect(find.textContaining('no aceptó tu cuenta de Google'), findsOneWidget);
+    });
+
+    //antes diagnostico de BK-11: el menu ofrecia "Continuar con correo", que
+    //llamaba GET /login sin JWT y el backend nuevo respondia 401
+    testWidgets('$capa - $tipo - Login - iniciar sesion va directo a Google, sin entrada por correo', (tester) async {
+      m.adaptador.responder('POST', '/auth/token', 200, leerContrato('autenticacion', 'token_200'));
+      await m.abrir(tester);
+
+      await m.iniciarSesionComo(tester, 'ana@unicauca.edu.co');
+
+      expect(find.text('Continuar con correo'), findsNothing);
+      expect(find.text('Ingresa tu correo'), findsNothing);
+      expect(m.adaptador.peticionesA('GET', '/login'), isEmpty);
+      expect(m.adaptador.peticionesA('POST', '/auth/token'), hasLength(1));
+      expect(m.sesion.perfilSesion?.role, Roles.coordinador);
     });
   });
 }

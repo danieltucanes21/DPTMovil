@@ -14,7 +14,7 @@ import 'package:dpt_movil/domain/servicios/servicioClase.dart';
 import 'package:dpt_movil/domain/servicios/servicioCurso.dart';
 import 'package:dpt_movil/domain/servicios/servicioHorario.dart';
 import 'package:dpt_movil/presentation/view/views/grupo/grupo.dart';
-import 'package:dpt_movil/presentation/view/widgets/mini_tarjeta.dart';
+import 'package:dpt_movil/presentation/view/views/grupo/seccionGrupo.dart';
 import 'package:dpt_movil/presentation/viewmodels/autenticacionViewModel.dart';
 import 'package:dpt_movil/presentation/viewmodels/detalleGrupoViewModel.dart';
 import 'package:flutter/material.dart';
@@ -118,9 +118,10 @@ void main() {
     testWidgets('$capa - $tipo - Pantalla del grupo - pinta los horarios y el boton de agregar', (tester) async {
       await montar(tester);
 
-      expect(find.text('Lunes - Coliseo'), findsOneWidget);
-      expect(find.text('Miércoles - Piscina'), findsOneWidget);
-      expect(find.text('AGREGAR HORARIO'), findsOneWidget);
+      expect(find.text('Lunes', skipOffstage: false), findsOneWidget);
+      expect(find.text('Miércoles', skipOffstage: false), findsOneWidget);
+      expect(find.text('Piscina', skipOffstage: false), findsOneWidget);
+      expect(find.text('Agregar horario', skipOffstage: false), findsOneWidget);
     });
 
     //HO-06: se guardan como LUNES..DOMINGO y se muestran con su etiqueta; los
@@ -132,15 +133,17 @@ void main() {
         {...base, 'id': 41, 'dia': 'SABADO', 'escenario': 'Coliseo'},
       ]);
 
-      expect(find.text('Miércoles - Piscina'), findsOneWidget);
-      expect(find.text('Sábado - Coliseo'), findsOneWidget);
+      expect(find.text('Miércoles', skipOffstage: false), findsOneWidget);
+      expect(find.text('Sábado', skipOffstage: false), findsOneWidget);
+      expect(find.text('MIERCOLES'), findsNothing);
     });
 
     testWidgets('$capa - $tipo - Formulario de horario - ofrece los dias con su etiqueta', (tester) async {
       await montar(tester);
 
-      await tester.ensureVisible(find.text('AGREGAR HORARIO'));
-      await tester.tap(find.text('AGREGAR HORARIO'));
+      await tester.ensureVisible(find.text('Agregar horario', skipOffstage: false));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar horario', skipOffstage: false));
       await tester.pumpAndSettle();
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pumpAndSettle();
@@ -155,23 +158,24 @@ void main() {
     testWidgets('$capa - $tipo - Pantalla del grupo - agregar horario abre el formulario', (tester) async {
       await montar(tester);
 
-      await tester.ensureVisible(find.text('AGREGAR HORARIO'));
-      await tester.tap(find.text('AGREGAR HORARIO'));
+      await tester.ensureVisible(find.text('Agregar horario', skipOffstage: false));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar horario', skipOffstage: false));
       await tester.pumpAndSettle();
 
       expect(observador.empujes, greaterThan(0), reason: 'tocar el boton no abrio ninguna pantalla ni dialogo');
     });
 
-    //MiniTarjeta.iconoAccion: onPressed solo hace print('hola')
-    testWidgets('$capa - $tipo - Pantalla del grupo - cerrar la tarjeta de un horario pide confirmacion para eliminarlo', (tester) async {
+    testWidgets('$capa - $tipo - Pantalla del grupo - eliminar un horario pide confirmacion', (tester) async {
       await montar(tester);
       final cerrar = find.descendant(
-        of: find.ancestor(of: find.text('Lunes - Coliseo'), matching: find.byType(MiniTarjeta)),
-        matching: find.byIcon(Icons.close),
+        of: find.ancestor(of: find.text('Lunes', skipOffstage: false), matching: find.byType(TarjetaSeccion, skipOffstage: false)),
+        matching: find.byTooltip('Eliminar horario', skipOffstage: false),
       );
       expect(cerrar, findsOneWidget);
 
       await tester.ensureVisible(cerrar);
+      await tester.pumpAndSettle();
       await tester.tap(cerrar);
       await tester.pumpAndSettle();
 
