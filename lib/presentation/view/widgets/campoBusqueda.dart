@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dpt_movil/config/theme/color_tema.dart';
+import 'package:dpt_movil/config/theme/forma_tema.dart';
 import 'package:dpt_movil/config/theme/tipografia.dart';
 
 class CampoBusqueda extends StatelessWidget {
@@ -20,8 +21,9 @@ class CampoBusqueda extends StatelessWidget {
             prefixIcon: Icon(Icons.search),
             hintStyle: TextStyle(
                 color: ColorTheme.neutral, fontFamily: Tipografia.cuerpo),
+            //barra de busqueda: redondeado medio del manual
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8.0),
+              borderRadius: FormaTema.radioMedio,
             ),
           ),
         ));

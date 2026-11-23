@@ -76,50 +76,8 @@ class _CategoriasViewState extends State<CategoriasView> {
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: Builder(builder: (context) => Menulateral()),
-        appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            toolbarHeight: 58,
-            titleSpacing: 0,
-
-            title: Row(
-              children: [
-                Container(
-                  width: 30,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF08086B),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    'U',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 21,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 9),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-
-                    Text(
-                      'Deporte Para Todos',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF08086B),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-
-        ),
+      //la barra comun: logo, nombre de la aplicacion y menu lateral
+      appBar: const Bar(),
 
       body: Consumer<CategoriaViewModel>(
         builder: (context, viewModel, child) {

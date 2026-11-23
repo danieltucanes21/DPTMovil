@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dpt_movil/presentation/view/widgets/imagenRemota.dart';
 import 'package:flutter/material.dart';
 import 'package:dpt_movil/config/theme/color_tema.dart';
+import 'package:dpt_movil/config/theme/forma_tema.dart';
 import 'package:dpt_movil/config/theme/tipografia.dart';
 
 ///Widget sin estado que muestra una tarjeta con imagen e informacion
@@ -38,8 +39,8 @@ class Tarjeta extends StatelessWidget {
     Card tarjeta = Card(
       margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
       elevation: 4,
-      //border redondeados
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      //tarjetas: redondeado medio del manual
+      shape: FormaTema.tarjeta,
       //Stack permite posicionar elementos sobre elementos, con el arguemento positioned
       child: SizedBox(
         width: dimension.width * 0.8,

@@ -1,6 +1,7 @@
 import 'package:dpt_movil/config/routes/app_rutas.dart';
 import 'package:dpt_movil/config/routes/roles.dart';
 import 'package:dpt_movil/config/theme/color_tema.dart';
+import 'package:dpt_movil/config/theme/forma_tema.dart';
 import 'package:dpt_movil/presentation/viewmodels/autenticacionViewModel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -197,9 +198,9 @@ class Menulateral extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: seleccionado ? Colors.white : ColorTheme.primary,
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: FormaTema.radioPequeno,
         child: InkWell(
-          borderRadius: BorderRadius.circular(9),
+          borderRadius: FormaTema.radioPequeno,
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),

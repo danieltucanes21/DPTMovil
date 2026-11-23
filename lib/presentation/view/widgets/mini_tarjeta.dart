@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:dpt_movil/config/theme/color_tema.dart';
+import 'package:dpt_movil/config/theme/forma_tema.dart';
 import 'package:dpt_movil/config/theme/tipografia.dart';
 import 'package:dpt_movil/presentation/view/widgets/avatar.dart';
 
@@ -60,7 +61,8 @@ class MiniTarjeta extends StatelessWidget {
         atrMargenDerecho,
         atrMargerInferior,
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      //tarjetas: redondeado medio del manual
+      shape: FormaTema.tarjeta,
       child: SizedBox(
         width: dimension.width * 0.9,
         child: Container(
